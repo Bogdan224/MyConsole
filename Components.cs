@@ -1,8 +1,6 @@
 ﻿namespace MyConsole2
 {
-    public interface ISpec
-    {
-    }
+    public interface ISpec;
 
     public class Detail : ISpec
     {
@@ -17,14 +15,6 @@
     public class Product
     {
         ISpec[] spec1 = new ISpec[2];
-        private ProductNote productNote;
-        private int multiplicity = 2;
-
-        //проверка кратности вхождения 
-        private void CheckMultiplicity()
-        {
-
-        }
     }
 
     public enum ComponentType

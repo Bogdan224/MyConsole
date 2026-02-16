@@ -4,8 +4,6 @@ namespace MyConsole2
 {
     public class ProductFileNote
     {
-        //private char[] ps;
-
         /// <summary>
         /// Длина записи данных
         /// </summary>
@@ -14,10 +12,10 @@ namespace MyConsole2
         /// <summary>
         /// Указатель на логически первую запись списка изделий
         /// </summary>
-        public byte[] FirstProductNotePtr { get; set; }
+        public ProductNote? FirstProductNotePtr { get; set; }
 
         /// <summary>
-        /// Указатель на свободную область файла;
+        /// Указатель на свободную область файла
         /// </summary>
         public byte[] FreeAreaPtr {  get; set; }
 
@@ -25,16 +23,16 @@ namespace MyConsole2
         /// Имя файла спецификаций
         /// </summary>
         [MaxLength(16)]
-        public char[] NameSpecificationFile { get; set; }
+        public char[] SpecificationFileName { get; set; }
 
         public ProductFileNote(char[] nameSpecificationFile)
         {
-            //ps = "PS".ToCharArray();
+            if (nameSpecificationFile.Length > 16)
+                throw new ArgumentOutOfRangeException("Количество знаков в названии файла не может быть больше 16!");
+
             Length = new byte[2];
-                
-            FirstProductNotePtr = new byte[4];
             FreeAreaPtr = new byte[4];
-            NameSpecificationFile = nameSpecificationFile;
+            SpecificationFileName = nameSpecificationFile;
         }
     }
 
@@ -43,7 +41,7 @@ namespace MyConsole2
         /// <summary>
         /// Указатель на логически первую запись списка
         /// </summary>
-        public byte[] FirstNotePtr { get; set; }
+        public SpecificationNote? FirstNotePtr { get; set; }
 
         /// <summary>
         /// Указатель на свободную область файла
@@ -51,8 +49,7 @@ namespace MyConsole2
         public byte[] FreeAreaPtr { get; set; }
 
         public SpecificationFileNote()
-        { 
-            FirstNotePtr = new byte[4];
+        {
             FreeAreaPtr = new byte[4];
         }
     }
@@ -60,31 +57,59 @@ namespace MyConsole2
     public class ProductNote
     {
         /// <summary>
-        /// Бит удаления
+        /// Бит удаления (может иметь значение false (запись активна) или true (запись помечена на удаление).
         /// </summary>
         public bool DeletionBit { get; set; }
 
         /// <summary>
-        /// Указатель на запись файла спецификаций, содержащую данные о первом компоненте данного изделия или узла
+        /// Указатель на запись файла спецификаций, содержащую данные о первом компоненте данного изделия или узла.
+        /// Для деталей этот указатель пустой.
         /// </summary>
-        public byte[] SpecificationNotePtr { get; set; }
+        public SpecificationFileNote? SpecificationNotePtr { get; set; }
 
         /// <summary>
-        /// Указатель на запись файла спецификаций, содержащую данные о первом компоненте данного изделия или узла
+        /// Указатель на следующую запись списка изделий
         /// </summary>
-        public byte[] NextProductNotePtr { get; set; }
+        public ProductNote? NextProductNotePtr { get; set; }
 
         /// <summary>
         /// Область данных
         /// </summary>
-        public char[] DataArea { get; set; }
+        public byte[] DataArea { get; set; }
 
-        public ProductNote(char[] dataArea)
+        public ProductNote(byte[] dataArea)
         {
             DeletionBit = false;
-            SpecificationNotePtr = new byte[4];
-            NextProductNotePtr = new byte[4];
             DataArea = dataArea;
+        }
+    }
+
+    public class SpecificationNote
+    {
+        /// <summary>
+        /// Бит удаления (может иметь значение false (запись активна) или true (запись помечена на удаление).
+        /// </summary>
+        public bool DeletionBit { get; set; }
+
+        /// <summary>
+        /// Указатель на запись файла списка изделий, содержащую наименование компонента спецификации
+        /// </summary>
+        public ProductFileNote? ProductFileNotePtr { get; set; }
+
+        /// <summary>
+        /// Кратность вхождения
+        /// </summary>
+        public byte[] Multiplicity { get; set; }
+
+        /// <summary>
+        /// Указатель на следующую запись списка-спецификации
+        /// </summary>
+        public SpecificationNote? NextSpecificationNotePtr { get; set; }
+
+        public SpecificationNote()
+        {
+            DeletionBit = false;
+            Multiplicity = new byte[2];
         }
     }
 }
