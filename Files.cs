@@ -2,18 +2,13 @@
 {
     public interface IFile;
 
-    public class ProductsListFile : IFile
+    public class ProductsListFile(ProductFileNote productFileNote) : IFile
     {
-        public ProductFileNote FileNote { get; set; }
-
-        public ProductsListFile(ProductFileNote productFileNote)
-        {
-            FileNote = productFileNote;
-        }
+        public ProductFileNote FileNote { get; set; } = productFileNote;
     }
 
-    public class SpecificationsFile : IFile
+    public class SpecificationsListFile(SpecificationFileNote productFileNote) : IFile
     {
-        private SpecificationFileNote fileNotes;
+        public SpecificationFileNote FileNote { get; set; } = productFileNote;
     }
 }

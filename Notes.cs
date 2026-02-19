@@ -12,7 +12,7 @@ namespace MyConsole2
         /// <summary>
         /// Указатель на логически первую запись списка изделий
         /// </summary>
-        public ProductNote? FirstProductNotePtr { get; set; }
+        public ProductNote? FirstProductNotePtr { get; private set; }
 
         /// <summary>
         /// Указатель на свободную область файла
@@ -28,11 +28,26 @@ namespace MyConsole2
         public ProductFileNote(char[] nameSpecificationFile)
         {
             if (nameSpecificationFile.Length > 16)
-                throw new ArgumentOutOfRangeException("Количество знаков в названии файла не может быть больше 16!");
+                throw new ArgumentOutOfRangeException(paramName: "Количество знаков в названии файла не может быть больше 16!");
 
             Length = new byte[2];
             FreeAreaPtr = new byte[4];
             SpecificationFileName = nameSpecificationFile;
+        }
+
+        public void AddProductNote(ProductNote productNote)
+        {
+            if (FirstProductNotePtr == null)
+                FirstProductNotePtr = productNote;
+            else
+            {
+                ProductNote? tmp = FirstProductNotePtr;
+                while(tmp.NextProductNotePtr != null)
+                {
+                    tmp = tmp.NextProductNotePtr;
+                }
+                tmp.NextProductNotePtr = productNote;
+            }    
         }
     }
 
@@ -41,7 +56,7 @@ namespace MyConsole2
         /// <summary>
         /// Указатель на логически первую запись списка
         /// </summary>
-        public SpecificationNote? FirstNotePtr { get; set; }
+        public SpecificationNote? FirstNotePtr { get; set; }    
 
         /// <summary>
         /// Указатель на свободную область файла
@@ -56,6 +71,8 @@ namespace MyConsole2
     
     public class ProductNote
     {
+        public Product Product { get; private set; }
+
         /// <summary>
         /// Бит удаления (может иметь значение false (запись активна) или true (запись помечена на удаление).
         /// </summary>
@@ -77,15 +94,18 @@ namespace MyConsole2
         /// </summary>
         public byte[] DataArea { get; set; }
 
-        public ProductNote(byte[] dataArea)
+        public ProductNote(Product product)
         {
             DeletionBit = false;
-            DataArea = dataArea;
+            DataArea = new byte[1000];
+            Product = product;
         }
     }
 
     public class SpecificationNote
     {
+        public ISpecification Spec { get; private set; }
+
         /// <summary>
         /// Бит удаления (может иметь значение false (запись активна) или true (запись помечена на удаление).
         /// </summary>
@@ -106,10 +126,13 @@ namespace MyConsole2
         /// </summary>
         public SpecificationNote? NextSpecificationNotePtr { get; set; }
 
-        public SpecificationNote()
+        public SpecificationNote(ISpecification spec)
         {
             DeletionBit = false;
             Multiplicity = new byte[2];
+            Spec = spec;
         }
     }
+
+
 }

@@ -1,20 +1,33 @@
-﻿namespace MyConsole2
+﻿using System.Xml.Linq;
+
+namespace MyConsole2
 {
-    public interface ISpec;
-
-    public class Detail : ISpec
+    public interface ISpecification;
+    public class Component(string name)
     {
+        public string ComponentName { get; set; } = name;
     }
 
-    public class Node : ISpec
-    {
-        ISpec[] specs = new ISpec[2];
+    public class Detail(string name) : Component(name), ISpecification;
 
+    public class Node(string name) : Component(name), ISpecification
+    {
+        public ISpecification?[] Specifications { get; private set; } = new ISpecification[2];
+
+        public Node(string name, ISpecification?[] specifications) : this(name)
+        {
+            Specifications = specifications;
+        }
     }
 
-    public class Product
+    public class Product(string name): Component(name)
     {
-        ISpec[] spec1 = new ISpec[2];
+        public ISpecification?[] Specifications { get; private set; } = new ISpecification[2];
+
+        public Product(string name, ISpecification?[] specifications) : this(name)
+        {
+            Specifications = specifications;
+        }
     }
 
     public enum ComponentType
@@ -26,14 +39,13 @@
     {
         public static ComponentType ToCompanentType(this string str)
         {
-            switch (str.ToLower())
+            return str.ToLower() switch
             {
-                case "деталь": return ComponentType.Detail;
-                case "узел": return ComponentType.Node;
-                case "изделие": return ComponentType.Product;
-                default:
-                    throw new ArgumentException("Компонент не найден!");
-            }
+                "деталь" => ComponentType.Detail,
+                "узел" => ComponentType.Node,
+                "изделие" => ComponentType.Product,
+                _ => throw new ArgumentException("Компонент не найден!"),
+            };
         }
     }
 }
