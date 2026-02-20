@@ -10,14 +10,14 @@
         public static void StartConsole()
         {
             string? commandLineText;
-            while(true)
+            ConsoleCommands commands = new ConsoleCommands();
+            while (true)
             {
                 Console.Write(startCommandLine);
                 commandLineText = Console.ReadLine();
 
                 if (commandLineText == null || commandLineText == "") continue;
                 var commandText = commandLineText.Split();
-                ConsoleCommands commands = new ConsoleCommands();
                 try
                 {
                     switch (commandText[0])
@@ -36,7 +36,7 @@
                                 var tmp = commandText[1].Split('/');
                                 commands.Input(tmp[0], tmp[1]);
                             }
-                            if (commandText.Length == 3) commands.Input(commandText[1], commandText[2].ToCompanentType());
+                            if (commandText.Length == 3) commands.Input(commandText[1], commandText[2].ToComponentType());
                             break;
                         case "Delete":
                             if (commandText.Length != 2) throw new ArgumentException(paramNotFoundExceptionText);
@@ -71,10 +71,19 @@
                             if (commandText.Length != 1) throw new ArgumentException(paramNotExistsExceptionText);
                             commands.Exit();
                             return;
+                        case "Test":
+                            commands.Test();
+                            break;
                         default:
                             throw new ArgumentException(commandNotFoundExceptionText);
                             
                     }
+                }
+                catch (NotImplementedException)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("Команда разрабатывается!");
+                    Console.ResetColor();
                 }
                 catch(Exception e)
                 {
@@ -89,41 +98,10 @@
     /// <summary>
     /// Команды для консоли
     /// </summary>
-    public class ConsoleCommands
+    public class ConsoleCommands : IDisposable
     {
-        private FileStream? fileStream;
-        private IFile? currentFile;
-
-        private Type CheckFileType(string filename)
-        {
-            if (filename.EndsWith(".prd"))
-                return typeof(ProductsListFile);
-            else if (filename.EndsWith(".prs"))
-                return typeof(SpecificationsListFile);
-            else
-                throw new ArgumentException("Имя файла указано не верно!");
-        }
-        private void CreateProductsListFile(string filename)
-        {
-            ProductFileNote fileNote = new ProductFileNote(filename.Replace(".prd", ".prs").ToCharArray());
-            ProductsListFile file = new ProductsListFile(fileNote);
-            using var writer = new BinaryWriter(File.Create(filename));
-            writer.Write(file.FileNote.Length);
-            //writer.Write(file.FileNote.FirstProductNotePtr.)
-            
-        }
-        private void CreateSpecificationsFile(string filename)
-        {
-            throw new NotImplementedException();
-        }
-        private void OpenProductsListFile(string filename)
-        {
-            throw new NotImplementedException();
-        }
-        private void OpenSpecificationsFile(string filename)
-        {
-            throw new NotImplementedException();
-        }
+        private FileManager? manager;
+        private string path = @$"C:\Users\{Environment.UserName}\Downloads\";
 
         /// <summary>
         /// Если файл существует и сигнатура соответствует заданию, команда требует
@@ -133,30 +111,38 @@
         /// отсутствует или не соответствует заданию, команда вызывает ошибку.
         /// </summary>
         /// <param name="filename">Имя файла</param>
-        public void Create(string filename)
+        public void Create(string filename, ushort recordLength = 20, string? specFilename = null)
         {
-            if(!File.Exists(filename))
+            if(File.Exists(path + filename))
             {
-                var fileType = CheckFileType(filename);
-                if (fileType == typeof(ProductsListFile))
-                    CreateProductsListFile(filename);
-                else if (fileType == typeof(SpecificationsListFile))
-                    CreateSpecificationsFile(filename);
-
+                while (true)
+                {
+                    Console.WriteLine("Перезаписать файлы? (Д/н)");
+                    string? ans = Console.ReadLine();
+                    if (ans == "Д")
+                    {
+                        throw new NotImplementedException();
+                        break;
+                    }
+                    else if (ans == "н")
+                    {
+                        manager = new FileManager(filename, recordLength, specFilename);
+                        break;
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                }
             }
             else
             {
-
+                if (!filename.EndsWith(".prd"))
+                    throw new Exception("У файла(-ов) неверно указано(-ы) расширение(-я)!");
+                manager = new FileManager(filename, recordLength, specFilename);
             }
-            //var fileType = CheckFileType(filename);
-
-            //if (fileType == typeof(ProductsListFile))
-            //    CreateProductsListFile(filename);
-            //else if(fileType == typeof(SpecificationsFile))
-            //    CreateSpecificationsFile(filename);
-
-            throw new NotImplementedException();
         }
+
         /// <summary>
         /// Команда логически удаляет запись с именем компонента из списка,
         /// устанавливая бит удаления в -1. Если на компонент имеются ссылки в спецификациях
@@ -178,13 +164,11 @@
             throw new NotImplementedException();
         }
         /// <summary>
-        /// Команда закрывает все файлы и завершает программу. Файлы при завершении
-        /// программы не уничтожаются. Они уничтожаются вручную после просмотра дампа файлов
-        /// при защите.
+        /// Команда закрывает все файлы и завершает программу.
         /// </summary>
         public void Exit()
         {
-            throw new NotImplementedException();
+            manager?.Dispose();
         }
         /// <summary>
         /// Команда выводит на экран или в указанный файл список команд.
@@ -233,18 +217,7 @@
         /// <param name="filename">Имя файла</param>
         public void Open(string filename)
         {
-            if(!File.Exists(filename))
-                throw new FileNotFoundException("Файл не найден!");
-
-            var fileType = CheckFileType(filename);
-            //fileStream = new FileStream(filename, FileMode.Open, FileAccess.ReadWrite);
-
-            if (fileType == typeof(ProductsListFile))
-                OpenProductsListFile(filename);
-            else if (fileType == typeof(SpecificationsListFile))
-                OpenSpecificationsFile(filename);
-            else
-                throw new Exception("Тип файла не определен!");
+            throw new NotImplementedException();
         }
         /// <summary>
         /// Команда выводит на экран состав компонента (спецификацию) (для детали эта команда вызывает ошибку):
@@ -279,6 +252,16 @@
         public void Truncate()
         {
             throw new NotImplementedException();
+        }
+
+        public void Test()
+        {
+            manager?.Test();
+        }
+
+        public void Dispose()
+        {
+            manager?.Dispose();
         }
     }
 }

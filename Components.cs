@@ -3,31 +3,11 @@
 namespace MyConsole2
 {
     public interface ISpecification;
-    public class Component(string name)
+
+    public class MyComponent(string name, ComponentType type)
     {
+        public ComponentType ComponentType { get; private set; } = type;
         public string ComponentName { get; set; } = name;
-    }
-
-    public class Detail(string name) : Component(name), ISpecification;
-
-    public class Node(string name) : Component(name), ISpecification
-    {
-        public ISpecification?[] Specifications { get; private set; } = new ISpecification[2];
-
-        public Node(string name, ISpecification?[] specifications) : this(name)
-        {
-            Specifications = specifications;
-        }
-    }
-
-    public class Product(string name): Component(name)
-    {
-        public ISpecification?[] Specifications { get; private set; } = new ISpecification[2];
-
-        public Product(string name, ISpecification?[] specifications) : this(name)
-        {
-            Specifications = specifications;
-        }
     }
 
     public enum ComponentType
@@ -37,7 +17,7 @@ namespace MyConsole2
 
     public static class StringExtentions
     {
-        public static ComponentType ToCompanentType(this string str)
+        public static ComponentType ToComponentType(this string str)
         {
             return str.ToLower() switch
             {
