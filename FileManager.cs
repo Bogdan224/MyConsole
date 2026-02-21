@@ -1,4 +1,6 @@
-﻿namespace MyConsole2
+﻿using System;
+
+namespace MyConsole2
 {
     public static class ByteArrayExtensions
     {
@@ -17,90 +19,148 @@
         private FileStream? _specFile;
         private ComponentListHeader _compHeader;
         private SpecificationHeader _specHeader;
-        private readonly string _compFileName;
-        private readonly string _specFileName;
         private string _path = @$"C:\Users\{Environment.UserName}\Downloads\";
 
         private List<MyComponent> components;
 
-        public FileManager(string filename, string? specFilename = null)
+        public FileManager()
         {
             components = new List<MyComponent>();
-            _compFileName = filename;
-
-            if (specFilename == null)
-                _specFileName = Path.ChangeExtension(_compFileName, ".prs");
-            else
-                _specFileName = specFilename;
         }
 
-        private void InitializeFiles(ushort dataRecordLength, out FileStream compFile, out FileStream specFile)
+        //private void InitializeFiles(ushort dataRecordLength, out FileStream compFile, out FileStream specFile)
+        //{
+        //    // Инициализация файла списка изделий
+        //    bool compExists = File.Exists(_path + _compFileName);
+        //    compFile = new FileStream(_path + _compFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+        //    if (!compExists || compFile.Length == 0)
+        //    {
+        //        // Создаем новый файл
+        //        _compHeader = new ComponentListHeader(dataRecordLength, _specFileName);
+        //        compFile.Write(_compHeader.ToBytes(), 0, ComponentListHeader.TotalSize);
+        //    }
+        //    else
+        //    {
+        //        // Читаем существующий заголовок
+        //        byte[] headerBuffer = new byte[ComponentListHeader.TotalSize];
+        //        compFile.Read(headerBuffer, 0, ComponentListHeader.TotalSize);
+        //        _compHeader = ComponentListHeader.FromBytes(headerBuffer);
+        //    }
+
+        //    // Инициализация файла спецификаций
+        //    bool specExists = File.Exists(_path + _specFileName);
+        //    specFile = new FileStream(_path + _specFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+
+        //    if (!specExists || specFile.Length == 0)
+        //    {
+        //        // Создаем новый файл
+        //        _specHeader = new SpecificationHeader();
+        //        specFile.Write(_specHeader.ToBytes(), 0, SpecificationHeader.TotalSize);
+        //    }
+        //    else
+        //    {
+        //        // Читаем существующий заголовок
+        //        byte[] headerBuffer = new byte[SpecificationHeader.TotalSize];
+        //        specFile.Read(headerBuffer, 0, SpecificationHeader.TotalSize);
+        //        _specHeader = SpecificationHeader.FromBytes(headerBuffer);
+        //    }
+        //}
+
+        public void RestoreFiles(string compFilename, string specFilename, ushort recordLength = 20)
         {
-            // Инициализация файла списка изделий
-            bool compExists = File.Exists(_path + _compFileName);
-            compFile = new FileStream(_path + _compFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
-            if (!compExists || compFile.Length == 0)
-            {
-                // Создаем новый файл
-                _compHeader = new ComponentListHeader(dataRecordLength, _specFileName);
-                compFile.Write(_compHeader.ToBytes(), 0, ComponentListHeader.TotalSize);
-            }
-            else
-            {
-                // Читаем существующий заголовок
-                byte[] headerBuffer = new byte[ComponentListHeader.TotalSize];
-                compFile.Read(headerBuffer, 0, ComponentListHeader.TotalSize);
-                _compHeader = ComponentListHeader.FromBytes(headerBuffer);
-            }
+            File.Delete(_path + compFilename);
+            File.Delete(_path + specFilename);
 
-            // Инициализация файла спецификаций
-            bool specExists = File.Exists(_path + _specFileName);
-            specFile = new FileStream(_path + _specFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
-
-            if (!specExists || specFile.Length == 0)
-            {
-                // Создаем новый файл
-                _specHeader = new SpecificationHeader();
-                specFile.Write(_specHeader.ToBytes(), 0, SpecificationHeader.TotalSize);
-            }
-            else
-            {
-                // Читаем существующий заголовок
-                byte[] headerBuffer = new byte[SpecificationHeader.TotalSize];
-                specFile.Read(headerBuffer, 0, SpecificationHeader.TotalSize);
-                _specHeader = SpecificationHeader.FromBytes(headerBuffer);
-            }
+            CreateFiles(compFilename, specFilename, recordLength);
         }
 
-        public void RestoreFiles(ushort recordLength = 20)
+        public void CreateFiles(string compFilename, string specFilename, ushort recordLength = 20)
         {
-            File.Delete(_path + _compFileName);
-            File.Delete(_path + _specFileName);
+            _compFile = new FileStream(_path + compFilename, FileMode.Create, FileAccess.ReadWrite);
 
-            CreateFiles();
-        }
-
-        public void CreateFiles(ushort recordLength = 20)
-        {
-            _compFile = new FileStream(_path + _compFileName, FileMode.Create, FileAccess.ReadWrite);
-
-            _compHeader = new ComponentListHeader(recordLength, _specFileName);
+            _compHeader = new ComponentListHeader(recordLength, specFilename);
             _compFile.Write(_compHeader.ToBytes(), 0, ComponentListHeader.TotalSize);
 
-            _specFile = new FileStream(_path + _specFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+            _specFile = new FileStream(_path + specFilename, FileMode.OpenOrCreate, FileAccess.ReadWrite);
             
             _specHeader = new SpecificationHeader();
             _specFile.Write(_specHeader.ToBytes(), 0, SpecificationHeader.TotalSize);
         }
 
-        public void OpenFiles(ushort recordLength = 20)
+        public void OpenFiles(string compFilename)
         {
-            //_compFile = new FileStream(_path + _compFileName, FileMode.Open, FileAccess.ReadWrite);
+            //Десериализуем файл списка изделий
+            _compFile = new FileStream(_path + compFilename, FileMode.Open, FileAccess.ReadWrite);
+
+            byte[] buffer = new byte[_compFile.Length];
+            int offset = 0;
+            _compFile.Read(buffer, 0, buffer.Length);
+
+            //Получаем заголовок файла
+            _compHeader = ComponentListHeader.FromBytes(buffer, offset);
+            offset += ComponentListHeader.TotalSize;
+
+            //Получаем остальные записи
+            if (_compHeader.FirstRecordPtr != -1)
+            {
+                _compHeader.FirstRecord = ComponentListRecord.FromBytes(buffer, offset);
+                offset += _compHeader.FirstRecord.GetTotalSize();
+
+                var tmp = _compHeader.FirstRecord;
+
+                while (tmp.NextRecordPtr != -1) 
+                {
+                    tmp.NextRecord = ComponentListRecord.FromBytes(buffer, offset);
+                    offset += tmp.NextRecord.GetTotalSize();
+                    tmp = tmp.NextRecord;
+                }
+            }
+
+            //Десериализуем файл спецификаций
+            var specFilename = new string(_compHeader.SpecFilename).Trim('\0');
+            _specFile = new FileStream(_path + specFilename, FileMode.Open, FileAccess.ReadWrite);
+
+            buffer = new byte[_specFile.Length];
+            offset = 0;
+            _specFile.Read(buffer, 0, buffer.Length);
+
+            //Получаем заголовок файла
+            _specHeader = SpecificationHeader.FromBytes(buffer, offset);
+            offset += SpecificationHeader.TotalSize;
+
+            //Получаем остальные записи
+            if (_specHeader.FirstRecordPtr != -1)
+            {
+                _specHeader.FirstRecord = SpecificationRecord.FromBytes(buffer, offset);
+                offset += _specHeader.FirstRecord.GetTotalSize();
+
+                var tmp = _specHeader.FirstRecord;
+
+                while (tmp.NextRecordPtr != -1)
+                {
+                    tmp.NextRecord = SpecificationRecord.FromBytes(buffer, offset);
+                    offset += tmp.NextRecord.GetTotalSize();
+                    tmp = tmp.NextRecord;
+                }
+            }
+
+            //Востанавливаем объекты из указателей
+            RestoreObjectsFromPtrs();
         }
 
-        private void RestorePtrs()
+        private void RestoreObjectsFromPtrs()
         {
-            throw new NotImplementedException();
+            if (_compHeader.FirstRecord != null)
+            {
+                components.Add(_compHeader.FirstRecord.DataArea);
+
+                var tmp = _compHeader.FirstRecord;
+
+                while (tmp.NextRecord != null)
+                {
+                    components.Add(tmp.NextRecord.DataArea);
+                }
+            }
         }
 
         /// <summary>
@@ -215,6 +275,8 @@
             }
 
             components.Add(component);
+
+            UpdateFiles();
         }
 
         /// <summary>
@@ -237,6 +299,8 @@
             if (tmpComp.DataArea.ComponentType == ComponentType.Product)
                 throw new Exception("Нельзя добавить изделие в спецификацию!");
             compRec.SpecificationRecord?.AddComponent(tmpComp.DataArea);
+
+            UpdateFiles();
         }
 
         public void Test()
@@ -258,8 +322,6 @@
             AddComponentToSpecification(myComponent.ComponentName, myComponent3.ComponentName);
             AddComponentToSpecification(myComponent1.ComponentName, myComponent2.ComponentName);
             AddComponentToSpecification(myComponent1.ComponentName, myComponent4.ComponentName);
-
-            UpdateFiles();
         }
 
         ///// <summary>
@@ -402,8 +464,6 @@
 
         public void Dispose()
         {
-            UpdateFiles();
-
             _compFile?.Dispose();
             _specFile?.Dispose();
         }

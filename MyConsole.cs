@@ -103,6 +103,13 @@
         private FileManager? manager;
         private string path = @$"C:\Users\{Environment.UserName}\Downloads\";
 
+        private bool CheckFilename(string filename)
+        {
+            if(filename.EndsWith(".prd") && filename.Length <= 16) 
+                return true;
+            return false;
+        }
+
         /// <summary>
         /// Если файл существует и сигнатура соответствует заданию, команда требует
         /// подтверждения на перезапись файла. При положительном ответе, файлы очищаются, после
@@ -113,7 +120,16 @@
         /// <param name="filename">Имя файла</param>
         public void Create(string filename, ushort recordLength = 20, string? specFilename = null)
         {
-            if(File.Exists(path + filename))
+            if (!CheckFilename(filename))
+                throw new Exception("Нельзя создать файл с заданным расширением!");
+
+            if (specFilename == null)
+                specFilename = Path.ChangeExtension(filename, ".prs");
+
+            if (manager != null)
+                manager.Dispose();
+            manager = new FileManager();
+            if (File.Exists(path + filename))
             {
                 while (true)
                 {
@@ -121,13 +137,12 @@
                     string? ans = Console.ReadLine();
                     if (ans == "Д")
                     {
-                        throw new NotImplementedException();
+                        manager.RestoreFiles(filename, specFilename, recordLength);
                         break;
                     }
                     else if (ans == "н")
                     {
-                        manager = new FileManager(filename, recordLength, specFilename);
-                        manager.RestoreFiles();
+                        manager.OpenFiles(filename);
                         break;
                     }
                     else
@@ -140,8 +155,7 @@
             {
                 if (!filename.EndsWith(".prd"))
                     throw new Exception("У файла(-ов) неверно указано(-ы) расширение(-я)!");
-                manager = new FileManager(filename, recordLength, specFilename);
-                manager.CreateFiles();
+                manager.CreateFiles(filename, specFilename, recordLength);
             }
         }
 
@@ -219,7 +233,17 @@
         /// <param name="filename">Имя файла</param>
         public void Open(string filename)
         {
-            throw new NotImplementedException();
+            if (!CheckFilename(filename))
+                throw new Exception("Нельзя открыть файл с заданным расширением!");
+
+            if (!File.Exists(path + filename))
+                throw new Exception("Файл не найден!");
+
+            if (manager != null)
+                manager.Dispose();
+
+            manager = new FileManager();
+            manager.OpenFiles(filename);
         }
         /// <summary>
         /// Команда выводит на экран состав компонента (спецификацию) (для детали эта команда вызывает ошибку):
