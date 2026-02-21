@@ -16,7 +16,8 @@
                 Console.Write(startCommandLine);
                 commandLineText = Console.ReadLine();
 
-                if (commandLineText == null || commandLineText == "") continue;
+                if (commandLineText == null || commandLineText == "") 
+                    continue;
                 var commandText = commandLineText.Split();
                 try
                 {
@@ -128,7 +129,7 @@
 
             if (manager != null)
                 manager.Dispose();
-            manager = new FileManager();
+
             if (File.Exists(path + filename))
             {
                 while (true)
@@ -137,12 +138,12 @@
                     string? ans = Console.ReadLine();
                     if (ans == "Д")
                     {
-                        manager.RestoreFiles(filename, specFilename, recordLength);
+                        manager = FileManager.RestoreFiles(filename, specFilename, recordLength);
                         break;
                     }
                     else if (ans == "н")
                     {
-                        manager.OpenFiles(filename);
+                        manager = FileManager.OpenFiles(filename);
                         break;
                     }
                     else
@@ -152,11 +153,7 @@
                 }
             }
             else
-            {
-                if (!filename.EndsWith(".prd"))
-                    throw new Exception("У файла(-ов) неверно указано(-ы) расширение(-я)!");
-                manager.CreateFiles(filename, specFilename, recordLength);
-            }
+                manager = FileManager.CreateFiles(filename, specFilename, recordLength);
         }
 
         /// <summary>
@@ -242,8 +239,7 @@
             if (manager != null)
                 manager.Dispose();
 
-            manager = new FileManager();
-            manager.OpenFiles(filename);
+            manager = FileManager.OpenFiles(filename);
         }
         /// <summary>
         /// Команда выводит на экран состав компонента (спецификацию) (для детали эта команда вызывает ошибку):

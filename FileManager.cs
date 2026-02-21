@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Xml.Linq;
 
 namespace MyConsole2
 {
@@ -15,98 +16,63 @@ namespace MyConsole2
     /// </summary>
     public class FileManager : IDisposable
     {
-        private FileStream? _compFile;
-        private FileStream? _specFile;
+        private FileStream _compFile;
+        private FileStream _specFile;
         private ComponentListHeader _compHeader;
         private SpecificationHeader _specHeader;
-        private string _path = @$"C:\Users\{Environment.UserName}\Downloads\";
+        private static string _path = @$"C:\Users\{Environment.UserName}\Downloads\";
 
-        private List<MyComponent> components;
-
-        public FileManager()
+        private FileManager(FileStream compFile, FileStream specFile, ComponentListHeader compHeader, SpecificationHeader specHeader)
         {
-            components = new List<MyComponent>();
+            _compFile = compFile;
+            _specFile = specFile;
+            _compHeader = compHeader;
+            _specHeader = specHeader;
         }
 
-        //private void InitializeFiles(ushort dataRecordLength, out FileStream compFile, out FileStream specFile)
-        //{
-        //    // Инициализация файла списка изделий
-        //    bool compExists = File.Exists(_path + _compFileName);
-        //    compFile = new FileStream(_path + _compFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
-        //    if (!compExists || compFile.Length == 0)
-        //    {
-        //        // Создаем новый файл
-        //        _compHeader = new ComponentListHeader(dataRecordLength, _specFileName);
-        //        compFile.Write(_compHeader.ToBytes(), 0, ComponentListHeader.TotalSize);
-        //    }
-        //    else
-        //    {
-        //        // Читаем существующий заголовок
-        //        byte[] headerBuffer = new byte[ComponentListHeader.TotalSize];
-        //        compFile.Read(headerBuffer, 0, ComponentListHeader.TotalSize);
-        //        _compHeader = ComponentListHeader.FromBytes(headerBuffer);
-        //    }
-
-        //    // Инициализация файла спецификаций
-        //    bool specExists = File.Exists(_path + _specFileName);
-        //    specFile = new FileStream(_path + _specFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
-
-        //    if (!specExists || specFile.Length == 0)
-        //    {
-        //        // Создаем новый файл
-        //        _specHeader = new SpecificationHeader();
-        //        specFile.Write(_specHeader.ToBytes(), 0, SpecificationHeader.TotalSize);
-        //    }
-        //    else
-        //    {
-        //        // Читаем существующий заголовок
-        //        byte[] headerBuffer = new byte[SpecificationHeader.TotalSize];
-        //        specFile.Read(headerBuffer, 0, SpecificationHeader.TotalSize);
-        //        _specHeader = SpecificationHeader.FromBytes(headerBuffer);
-        //    }
-        //}
-
-        public void RestoreFiles(string compFilename, string specFilename, ushort recordLength = 20)
+        public static FileManager RestoreFiles(string compFilename, string specFilename, ushort recordLength = 20)
         {
             File.Delete(_path + compFilename);
             File.Delete(_path + specFilename);
 
-            CreateFiles(compFilename, specFilename, recordLength);
+            return CreateFiles(compFilename, specFilename, recordLength);
         }
 
-        public void CreateFiles(string compFilename, string specFilename, ushort recordLength = 20)
+        public static FileManager CreateFiles(string compFilename, string specFilename, ushort recordLength = 20)
         {
-            _compFile = new FileStream(_path + compFilename, FileMode.Create, FileAccess.ReadWrite);
+            var compFile = new FileStream(_path + compFilename, FileMode.Create, FileAccess.ReadWrite);
 
-            _compHeader = new ComponentListHeader(recordLength, specFilename);
-            _compFile.Write(_compHeader.ToBytes(), 0, ComponentListHeader.TotalSize);
+            var compHeader = new ComponentListHeader(recordLength, specFilename);
+            compFile.Write(compHeader.ToBytes(), 0, compHeader.TotalSize);
 
-            _specFile = new FileStream(_path + specFilename, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+            var specFile = new FileStream(_path + specFilename, FileMode.OpenOrCreate, FileAccess.ReadWrite);
             
-            _specHeader = new SpecificationHeader();
-            _specFile.Write(_specHeader.ToBytes(), 0, SpecificationHeader.TotalSize);
+            var specHeader = new SpecificationHeader();
+            specFile.Write(specHeader.ToBytes(), 0, specHeader.TotalSize);
+
+            return new FileManager(compFile, specFile, compHeader, specHeader);
         }
 
-        public void OpenFiles(string compFilename)
+        public static FileManager OpenFiles(string compFilename)
         {
             //Десериализуем файл списка изделий
-            _compFile = new FileStream(_path + compFilename, FileMode.Open, FileAccess.ReadWrite);
+            var compFile = new FileStream(_path + compFilename, FileMode.Open, FileAccess.ReadWrite);
 
-            byte[] buffer = new byte[_compFile.Length];
+            byte[] buffer = new byte[compFile.Length];
             int offset = 0;
-            _compFile.Read(buffer, 0, buffer.Length);
+            compFile.Read(buffer, 0, buffer.Length);
 
             //Получаем заголовок файла
-            _compHeader = ComponentListHeader.FromBytes(buffer, offset);
-            offset += ComponentListHeader.TotalSize;
+            var compHeader = ComponentListHeader.FromBytes(buffer, offset);
+            offset += compHeader.TotalSize;
 
             //Получаем остальные записи
-            if (_compHeader.FirstRecordPtr != -1)
+            if (compHeader.FirstRecordPtr != -1)
             {
-                _compHeader.FirstRecord = ComponentListRecord.FromBytes(buffer, offset);
-                offset += _compHeader.FirstRecord.GetTotalSize();
+                compHeader.FirstRecord = ComponentListRecord.FromBytes(buffer, offset);
+                offset += compHeader.FirstRecord.GetTotalSize();
 
-                var tmp = _compHeader.FirstRecord;
+                var tmp = compHeader.FirstRecord;
 
                 while (tmp.NextRecordPtr != -1) 
                 {
@@ -117,24 +83,24 @@ namespace MyConsole2
             }
 
             //Десериализуем файл спецификаций
-            var specFilename = new string(_compHeader.SpecFilename).Trim('\0');
-            _specFile = new FileStream(_path + specFilename, FileMode.Open, FileAccess.ReadWrite);
+            var specFilename = new string(compHeader.SpecFilename).Trim('\0');
+            var specFile = new FileStream(_path + specFilename, FileMode.Open, FileAccess.ReadWrite);
 
-            buffer = new byte[_specFile.Length];
+            buffer = new byte[specFile.Length];
             offset = 0;
-            _specFile.Read(buffer, 0, buffer.Length);
+            specFile.Read(buffer, 0, buffer.Length);
 
             //Получаем заголовок файла
-            _specHeader = SpecificationHeader.FromBytes(buffer, offset);
-            offset += SpecificationHeader.TotalSize;
+            var specHeader = SpecificationHeader.FromBytes(buffer, offset);
+            offset += specHeader.TotalSize;
 
             //Получаем остальные записи
-            if (_specHeader.FirstRecordPtr != -1)
+            if (specHeader.FirstRecordPtr != -1)
             {
-                _specHeader.FirstRecord = SpecificationRecord.FromBytes(buffer, offset);
-                offset += _specHeader.FirstRecord.GetTotalSize();
+                specHeader.FirstRecord = SpecificationRecord.FromBytes(buffer, offset); 
+                offset += specHeader.FirstRecord.GetTotalSize();
 
-                var tmp = _specHeader.FirstRecord;
+                var tmp = specHeader.FirstRecord;
 
                 while (tmp.NextRecordPtr != -1)
                 {
@@ -145,22 +111,14 @@ namespace MyConsole2
             }
 
             //Востанавливаем объекты из указателей
-            RestoreObjectsFromPtrs();
+            RestoreObjectsFromPtrs(compHeader, specHeader);
+
+            return new FileManager(compFile, specFile, compHeader, specHeader);
         }
 
-        private void RestoreObjectsFromPtrs()
+        private static void RestoreObjectsFromPtrs(ComponentListHeader compHeader, SpecificationHeader specHeader)
         {
-            if (_compHeader.FirstRecord != null)
-            {
-                components.Add(_compHeader.FirstRecord.DataArea);
-
-                var tmp = _compHeader.FirstRecord;
-
-                while (tmp.NextRecord != null)
-                {
-                    components.Add(tmp.NextRecord.DataArea);
-                }
-            }
+            throw new NotImplementedException();
         }
 
         /// <summary>
@@ -172,51 +130,22 @@ namespace MyConsole2
         {
             if (_compHeader.FirstRecord != null)
             {
-                ComponentListRecord? tmp = _compHeader.FirstRecord;
+                var tmp = _compHeader.FirstRecord;
                 while (tmp != null)
                 {
-                    if (tmp.DataArea.ComponentName == name)
-                        return tmp;
+                    if ((tmp as ComponentListRecord)!.DataArea.ComponentName == name)
+                        return tmp as ComponentListRecord;
                     tmp = tmp.NextRecord;
                 }
             }
             return null;
         }
 
-        private void AddMyCompInSpecByName(string name, string nameAdded)
-        {
-            if (_specHeader.FirstRecord != null)
-            {
-                ComponentListRecord? tmp = _compHeader.FirstRecord;
-                while (tmp != null)
-                {
-                    if (tmp.DataArea.ComponentName == name)
-                    {
-                        var tmpAdded = FindMyCompInCompListByName(nameAdded);
-                        if (tmpAdded == null)
-                            throw new Exception("Комплектующего с таким именем не существует");
-                        //tmp.SpecificationRecord.Components.Add()
-                    }
-
-                    tmp = tmp.NextRecord;
-                }
-            }
-            throw new Exception("Не удалось добавить комплектующее!");
-        }
-
-        private bool CheckOpenFiles()
-        {
-            return _compFile != null && _specFile != null;
-        }
-
         /// <summary>
         /// Добавление компонента в список изделий
         /// </summary>
         public void AddComponentToComponentList(MyComponent component)
-        {
-            if (!CheckOpenFiles())
-                throw new Exception("Файлы должны быть открыты!");
-
+        { 
             if (FindMyCompInCompListByName(component.ComponentName) != null)
                 throw new ArgumentException("Компонент c таким именем уже существует!");
 
@@ -231,15 +160,15 @@ namespace MyConsole2
                     _specHeader.FirstRecord = new SpecificationRecord()
                     {
                         ComponentRecord = record,
-                        ComponentRecordPtr = record.GetHashCode(),
+                        ComponentRecordPtr = record.RecordPtr,
                     };
-                    _specHeader.FirstRecordPtr = _specHeader.FirstRecord.GetHashCode();
-                    tmpSpecRec = _specHeader.FirstRecord;
+                    _specHeader.FirstRecordPtr = _specHeader.FirstRecord.RecordPtr;
+                    tmpSpecRec = (SpecificationRecord)_specHeader.FirstRecord;
                 }
                 //Иначе ищем пустую спецификацию в листе спецификаций
                 else
                 {
-                    SpecificationRecord? tmp = _specHeader.FirstRecord;
+                    var tmp = _specHeader.FirstRecord;
                     while (tmp.NextRecord != null)
                     {
                         tmp = tmp.NextRecord;
@@ -247,34 +176,32 @@ namespace MyConsole2
                     tmp.NextRecord = new SpecificationRecord()
                     {
                         ComponentRecord = record,
-                        ComponentRecordPtr = record.GetHashCode(),
+                        ComponentRecordPtr = record.RecordPtr,
                     };
-                    tmp.NextRecordPtr = tmp.NextRecord.GetHashCode();
-                    tmpSpecRec = tmp.NextRecord;
+                    tmp.NextRecordPtr = tmp.NextRecord.RecordPtr;
+                    tmpSpecRec = (SpecificationRecord)tmp.NextRecord;
                 }
 
                 record.SpecificationRecord = tmpSpecRec;
-                record.SpecificationRecordPtr = tmpSpecRec.GetHashCode();
+                record.SpecificationRecordPtr = tmpSpecRec.RecordPtr;
             }
 
             //Добавляем компонент в список компонентов
             if (_compHeader.FirstRecord != null)
             {
-                ComponentListRecord tmp = _compHeader.FirstRecord;
+                var tmp = _compHeader.FirstRecord;
                 while (tmp.NextRecord != null)
                 {
                     tmp = tmp.NextRecord;
                 }
                 tmp.NextRecord = record;
-                tmp.NextRecordPtr = record.GetHashCode();
+                tmp.NextRecordPtr = record.RecordPtr;
             }
             else
             {
                 _compHeader.FirstRecord = record;
-                _compHeader.FirstRecordPtr = record.GetHashCode();
+                _compHeader.FirstRecordPtr = record.RecordPtr;
             }
-
-            components.Add(component);
 
             UpdateFiles();
         }
@@ -284,9 +211,6 @@ namespace MyConsole2
         /// </summary>
         public void AddComponentToSpecification(string component, string componentAdded)
         {
-            if (!CheckOpenFiles())
-                throw new Exception("Файлы должны быть открыты!");
-
             var compRec = FindMyCompInCompListByName(component);
             if (compRec == null)
                 throw new ArgumentException("Компонент не найден!");
@@ -305,9 +229,6 @@ namespace MyConsole2
 
         public void Test()
         {
-            if (!CheckOpenFiles())
-                throw new Exception("Файлы должны быть открыты!");
-
             MyComponent myComponent = new("Изделие1", ComponentType.Product);
             MyComponent myComponent1 = new("Узел1", ComponentType.Node);
             MyComponent myComponent2 = new("Узел2", ComponentType.Node);

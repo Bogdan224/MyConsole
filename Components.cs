@@ -8,6 +8,11 @@ namespace MyConsole2
     {
         public ComponentType ComponentType { get; private set; } = type;
         public string ComponentName { get; set; } = name;
+
+        public override int GetHashCode()
+        {
+            return (ComponentName.GetHashCode() + ComponentType.GetHashCode())/2;
+        }
     }
 
     public enum ComponentType
