@@ -13,64 +13,89 @@
     /// </summary>
     public class FileManager : IDisposable
     {
-        private FileStream _compFile;
-        private FileStream _specFile;
+        private FileStream? _compFile;
+        private FileStream? _specFile;
         private ComponentListHeader _compHeader;
         private SpecificationHeader _specHeader;
         private readonly string _compFileName;
         private readonly string _specFileName;
-        private string path = @$"C:\Users\{Environment.UserName}\Downloads\";
+        private string _path = @$"C:\Users\{Environment.UserName}\Downloads\";
 
-        public FileManager(string filename, ushort recordLength = 20, string? specFilename = null)
+        private List<MyComponent> components;
+
+        public FileManager(string filename, string? specFilename = null)
         {
+            components = new List<MyComponent>();
             _compFileName = filename;
 
-            if(specFilename == null)
+            if (specFilename == null)
                 _specFileName = Path.ChangeExtension(_compFileName, ".prs");
             else
                 _specFileName = specFilename;
-
-            InitializeFiles(recordLength);
         }
 
-        private void InitializeFiles(ushort dataRecordLength)
+        private void InitializeFiles(ushort dataRecordLength, out FileStream compFile, out FileStream specFile)
         {
             // Инициализация файла списка изделий
-            bool compExists = File.Exists(path + _compFileName);
-            _compFile = new FileStream(path + _compFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
-            if (!compExists || _compFile.Length == 0)
+            bool compExists = File.Exists(_path + _compFileName);
+            compFile = new FileStream(_path + _compFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+            if (!compExists || compFile.Length == 0)
             {
                 // Создаем новый файл
                 _compHeader = new ComponentListHeader(dataRecordLength, _specFileName);
-                _compFile.Write(_compHeader.ToBytes(), 0, ComponentListHeader.TotalSize);
+                compFile.Write(_compHeader.ToBytes(), 0, ComponentListHeader.TotalSize);
             }
             else
             {
                 // Читаем существующий заголовок
                 byte[] headerBuffer = new byte[ComponentListHeader.TotalSize];
-                _compFile.Read(headerBuffer, 0, ComponentListHeader.TotalSize);
+                compFile.Read(headerBuffer, 0, ComponentListHeader.TotalSize);
                 _compHeader = ComponentListHeader.FromBytes(headerBuffer);
             }
 
             // Инициализация файла спецификаций
-            bool specExists = File.Exists(path + _specFileName);
-            _specFile = new FileStream(path + _specFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+            bool specExists = File.Exists(_path + _specFileName);
+            specFile = new FileStream(_path + _specFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
 
-            if (!specExists || _specFile.Length == 0)
+            if (!specExists || specFile.Length == 0)
             {
                 // Создаем новый файл
                 _specHeader = new SpecificationHeader();
-                _specFile.Write(_specHeader.ToBytes(), 0, SpecificationHeader.TotalSize);
+                specFile.Write(_specHeader.ToBytes(), 0, SpecificationHeader.TotalSize);
             }
             else
             {
                 // Читаем существующий заголовок
                 byte[] headerBuffer = new byte[SpecificationHeader.TotalSize];
-                _specFile.Read(headerBuffer, 0, SpecificationHeader.TotalSize);
+                specFile.Read(headerBuffer, 0, SpecificationHeader.TotalSize);
                 _specHeader = SpecificationHeader.FromBytes(headerBuffer);
             }
-            //if(compExists && specExists)
-            //    RestorePtrs();
+        }
+
+        public void RestoreFiles(ushort recordLength = 20)
+        {
+            File.Delete(_path + _compFileName);
+            File.Delete(_path + _specFileName);
+
+            CreateFiles();
+        }
+
+        public void CreateFiles(ushort recordLength = 20)
+        {
+            _compFile = new FileStream(_path + _compFileName, FileMode.Create, FileAccess.ReadWrite);
+
+            _compHeader = new ComponentListHeader(recordLength, _specFileName);
+            _compFile.Write(_compHeader.ToBytes(), 0, ComponentListHeader.TotalSize);
+
+            _specFile = new FileStream(_path + _specFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+            
+            _specHeader = new SpecificationHeader();
+            _specFile.Write(_specHeader.ToBytes(), 0, SpecificationHeader.TotalSize);
+        }
+
+        public void OpenFiles(ushort recordLength = 20)
+        {
+            //_compFile = new FileStream(_path + _compFileName, FileMode.Open, FileAccess.ReadWrite);
         }
 
         private void RestorePtrs()
@@ -78,7 +103,12 @@
             throw new NotImplementedException();
         }
 
-        private ComponentListRecord? FindMyComponentInFileByName(string name)
+        /// <summary>
+        /// Метод ищет запись с названием компонента
+        /// </summary>
+        /// <param name="name">Название компонента</param>
+        /// <returns>Если запись с компонентом найдена, то возвращает запись, иначе null</returns>
+        private ComponentListRecord? FindMyCompInCompListByName(string name)
         {
             if (_compHeader.FirstRecord != null)
             {
@@ -93,38 +123,79 @@
             return null;
         }
 
+        private void AddMyCompInSpecByName(string name, string nameAdded)
+        {
+            if (_specHeader.FirstRecord != null)
+            {
+                ComponentListRecord? tmp = _compHeader.FirstRecord;
+                while (tmp != null)
+                {
+                    if (tmp.DataArea.ComponentName == name)
+                    {
+                        var tmpAdded = FindMyCompInCompListByName(nameAdded);
+                        if (tmpAdded == null)
+                            throw new Exception("Комплектующего с таким именем не существует");
+                        //tmp.SpecificationRecord.Components.Add()
+                    }
+
+                    tmp = tmp.NextRecord;
+                }
+            }
+            throw new Exception("Не удалось добавить комплектующее!");
+        }
+
+        private bool CheckOpenFiles()
+        {
+            return _compFile != null && _specFile != null;
+        }
+
         /// <summary>
         /// Добавление компонента в список изделий
         /// </summary>
         public void AddComponentToComponentList(MyComponent component)
         {
-            if (FindMyComponentInFileByName(component.ComponentName) != null)
+            if (!CheckOpenFiles())
+                throw new Exception("Файлы должны быть открыты!");
+
+            if (FindMyCompInCompListByName(component.ComponentName) != null)
                 throw new ArgumentException("Компонент c таким именем уже существует!");
 
-            SpecificationRecord? tmpSpecRec = null;
-            //Если лист спецификаций пустой, добавляем в него пустую спецификацию и записываем ссылку на нее в запись компонента
-            if (_specHeader.FirstRecord == null)
-            {
-                _specHeader.FirstRecord = new SpecificationRecord();
-                tmpSpecRec = _specHeader.FirstRecord;
-            }
-            //Иначе ищем пустую спецификацию в листе спецификаций
-            else
-            {
-                SpecificationRecord? tmp = _specHeader.FirstRecord;
-                while (tmp.NextRecord != null)
-                {
-                    tmp = tmp.NextRecord;
-                }
-                tmp.NextRecord = new SpecificationRecord();
-                tmpSpecRec = tmp.NextRecord;
-            }
+            var record = new ComponentListRecord(component);
 
-            var record = new ComponentListRecord(component)
+            if (component.ComponentType != ComponentType.Detail)
             {
-                SpecificationRecord = tmpSpecRec,
-                SpecificationRecordPtr = BitConverter.GetBytes(tmpSpecRec.GetHashCode())
-            };
+                SpecificationRecord? tmpSpecRec;
+                //Если лист спецификаций пустой, добавляем в него пустую спецификацию и записываем ссылку на нее в запись компонента
+                if (_specHeader.FirstRecord == null)
+                {
+                    _specHeader.FirstRecord = new SpecificationRecord()
+                    {
+                        ComponentRecord = record,
+                        ComponentRecordPtr = record.GetHashCode(),
+                    };
+                    _specHeader.FirstRecordPtr = _specHeader.FirstRecord.GetHashCode();
+                    tmpSpecRec = _specHeader.FirstRecord;
+                }
+                //Иначе ищем пустую спецификацию в листе спецификаций
+                else
+                {
+                    SpecificationRecord? tmp = _specHeader.FirstRecord;
+                    while (tmp.NextRecord != null)
+                    {
+                        tmp = tmp.NextRecord;
+                    }
+                    tmp.NextRecord = new SpecificationRecord()
+                    {
+                        ComponentRecord = record,
+                        ComponentRecordPtr = record.GetHashCode(),
+                    };
+                    tmp.NextRecordPtr = tmp.NextRecord.GetHashCode();
+                    tmpSpecRec = tmp.NextRecord;
+                }
+
+                record.SpecificationRecord = tmpSpecRec;
+                record.SpecificationRecordPtr = tmpSpecRec.GetHashCode();
+            }
 
             //Добавляем компонент в список компонентов
             if (_compHeader.FirstRecord != null)
@@ -135,19 +206,15 @@
                     tmp = tmp.NextRecord;
                 }
                 tmp.NextRecord = record;
-                tmp.NextRecordPtr = BitConverter.GetBytes(record.GetHashCode());
+                tmp.NextRecordPtr = record.GetHashCode();
             }
             else
             {
                 _compHeader.FirstRecord = record;
-                _compHeader.FirstRecordPtr = BitConverter.GetBytes(record.GetHashCode());
+                _compHeader.FirstRecordPtr = record.GetHashCode();
             }
 
-            var tmpComp = _compHeader.ToBytes();
-            var tmpSpec = _specHeader.ToBytes();
-
-            _compFile.Write(tmpComp, 0, tmpComp.Length);
-            _specFile.Write(tmpSpec, 0, tmpSpec.Length);
+            components.Add(component);
         }
 
         /// <summary>
@@ -155,27 +222,28 @@
         /// </summary>
         public void AddComponentToSpecification(string component, string componentAdded)
         {
-            var compRec = FindMyComponentInFileByName(component);
+            if (!CheckOpenFiles())
+                throw new Exception("Файлы должны быть открыты!");
+
+            var compRec = FindMyCompInCompListByName(component);
             if (compRec == null)
-                throw new ArgumentException("Комплектующее не найдено!");
+                throw new ArgumentException("Компонент не найден!");
+            if (compRec.DataArea.ComponentType == ComponentType.Detail)
+                throw new Exception("Деталь не может иметь спецификацию!");
 
-            if (compRec.SpecificationRecord?.Components.Count == compRec.SpecificationRecord?.Quantity)
-                throw new Exception("Достигнут лимит компонентов в спецификации!");
-
-            var tmpComp = FindMyComponentInFileByName(componentAdded);
+            var tmpComp = FindMyCompInCompListByName(componentAdded);
             if (tmpComp == null)
-                throw new Exception("Невозможно добавить не существующий компонент!");
-            compRec.SpecificationRecord?.Components.Add(tmpComp.DataArea);
-
-            var tmpCompArray = _compHeader.ToBytes();
-            var tmpSpec = _specHeader.ToBytes();
-
-            _compFile.Write(tmpCompArray, 0, tmpCompArray.Length);
-            _specFile.Write(tmpSpec, 0, tmpSpec.Length);
+                throw new Exception("Невозможно добавить не существующее комплектующее!");
+            if (tmpComp.DataArea.ComponentType == ComponentType.Product)
+                throw new Exception("Нельзя добавить изделие в спецификацию!");
+            compRec.SpecificationRecord?.AddComponent(tmpComp.DataArea);
         }
 
         public void Test()
         {
+            if (!CheckOpenFiles())
+                throw new Exception("Файлы должны быть открыты!");
+
             MyComponent myComponent = new("Изделие1", ComponentType.Product);
             MyComponent myComponent1 = new("Узел1", ComponentType.Node);
             MyComponent myComponent2 = new("Узел2", ComponentType.Node);
@@ -190,6 +258,8 @@
             AddComponentToSpecification(myComponent.ComponentName, myComponent3.ComponentName);
             AddComponentToSpecification(myComponent1.ComponentName, myComponent2.ComponentName);
             AddComponentToSpecification(myComponent1.ComponentName, myComponent4.ComponentName);
+
+            UpdateFiles();
         }
 
         ///// <summary>
@@ -308,10 +378,31 @@
         //    _specFile.Write(_specHeader.ToBytes(), 0, SpecificationHeader.TotalSize);
         //}
 
+        private void UpdateCompFile()
+        {
+            var comp = _compHeader.ToBytes();
+
+            _compFile.Seek(0, SeekOrigin.Begin);
+            _compFile.Write(comp, 0, comp.Length);
+        }
+
+        private void UpdateSpecFile()
+        {
+            var spec = _specHeader.ToBytes();
+
+            _specFile.Seek(0, SeekOrigin.Begin);
+            _specFile.Write(spec, 0, spec.Length);
+        }
+
+        private void UpdateFiles()
+        {
+            UpdateCompFile();
+            UpdateSpecFile();
+        }
+
         public void Dispose()
         {
-            //UpdatePartsHeader();
-            //UpdateSpecHeader();
+            UpdateFiles();
 
             _compFile?.Dispose();
             _specFile?.Dispose();

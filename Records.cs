@@ -13,6 +13,7 @@ namespace MyConsole2
         private const int RecordLengthSize = 2;
         private const int FirstRecordPtrSize = 4;
         private const int FreeAreaPtrSize = 4;
+
         private const int SpecFilenameSize = 16;
 
         public const int TotalSize = SignatureSize + RecordLengthSize +
@@ -22,7 +23,7 @@ namespace MyConsole2
 
         public byte[] Signature { get; set; } // "PS"
         public ushort DataRecordLength { get; set; }
-        public byte[] FirstRecordPtr { get; set; }
+        public int FirstRecordPtr { get; set; }
         public byte[] FreeAreaPtr { get; set; }
         public char[] SpecFilename { get; set; }
 
@@ -30,7 +31,7 @@ namespace MyConsole2
         {
             Signature = Encoding.ASCII.GetBytes("PS");
             DataRecordLength = dataRecordLength;
-            FirstRecordPtr = BitConverter.GetBytes(-1);
+            FirstRecordPtr = -1;
             FreeAreaPtr = new byte[FreeAreaPtrSize];
             SpecFilename = new char[SpecFilenameSize];
             Array.Copy(specFilename.ToCharArray(), SpecFilename, specFilename.Length);
@@ -48,7 +49,7 @@ namespace MyConsole2
             Array.Copy(BitConverter.GetBytes(DataRecordLength), 0, buffer, offset, RecordLengthSize);
             offset += RecordLengthSize;
 
-            Array.Copy(FirstRecordPtr, 0, buffer, offset, FirstRecordPtrSize);
+            Array.Copy(BitConverter.GetBytes(FirstRecordPtr), 0, buffer, offset, FirstRecordPtrSize);
             offset += FirstRecordPtrSize;
 
             Array.Copy(FreeAreaPtr, 0, buffer, offset, FreeAreaPtrSize);
@@ -79,8 +80,7 @@ namespace MyConsole2
             offset += RecordLengthSize;
 
             // FirstRecordPtr
-            header.FirstRecordPtr = new byte[FirstRecordPtrSize];
-            Array.Copy(buffer, offset, header.FirstRecordPtr, 0, FirstRecordPtrSize);
+            header.FirstRecordPtr = BitConverter.ToInt32(buffer, offset);
             offset += FirstRecordPtrSize;
 
             // FreeAreaPtr
@@ -110,21 +110,22 @@ namespace MyConsole2
         public SpecificationRecord? SpecificationRecord { get; set; }
 
         public bool IsDeleted { get; set; } // 0 - активно, -1 - удалено
-        public byte[] SpecificationRecordPtr { get; set; } // Указатель на первую запись в спецификации
-        public byte[] NextRecordPtr { get; set; } // Указатель на следующую запись
-        public MyComponent DataArea { get; private set; } // Наименование компонента
+        public int SpecificationRecordPtr { get; set; } // Указатель на первую запись в спецификации
+        public int NextRecordPtr { get; set; } // Указатель на следующую запись
+        public MyComponent DataArea { get; private set; } // Компонент
 
         public ComponentListRecord(MyComponent component)
         {
             IsDeleted = false;
-            SpecificationRecordPtr = BitConverter.GetBytes(-1);
-            NextRecordPtr = BitConverter.GetBytes(-1);
+            SpecificationRecordPtr = -1;
+            NextRecordPtr = -1;
             DataArea = component;
         }
 
         private int GetTotalSize()
         {
-            return DeletionBitSize + SpecificationRecordPtrSize + NextRecordPtrSize + DataArea.ComponentName.Length + ComponentTypeSize;
+            return DeletionBitSize + SpecificationRecordPtrSize + NextRecordPtrSize + 
+                DataArea.ComponentName.Length + ComponentTypeSize;
         }
 
         //Сериализация
@@ -136,15 +137,15 @@ namespace MyConsole2
             buffer[offset] = BitConverter.GetBytes(IsDeleted)[0];
             offset += DeletionBitSize;
 
-            Array.Copy(SpecificationRecordPtr, 0, buffer, offset, SpecificationRecordPtrSize);
+            Array.Copy(BitConverter.GetBytes(SpecificationRecordPtr), 0, buffer, offset, SpecificationRecordPtrSize);
             offset += SpecificationRecordPtrSize;
 
-            Array.Copy(NextRecordPtr, 0, buffer, offset, NextRecordPtrSize);
+            Array.Copy(BitConverter.GetBytes(NextRecordPtr), 0, buffer, offset, NextRecordPtrSize);
             offset += NextRecordPtrSize;
 
             byte[] nameBytes = Encoding.UTF8.GetBytes(DataArea.ComponentName);
             Array.Copy(nameBytes, 0, buffer, offset, DataArea.ComponentName.Length);
-            offset += DataArea.ComponentName.Length;
+            offset += DataArea.ComponentName.Length;  
 
             Array.Copy(BitConverter.GetBytes(Convert.ToInt16(DataArea.ComponentType)), 0, buffer, offset, ComponentTypeSize);
             
@@ -163,16 +164,14 @@ namespace MyConsole2
             offset += DeletionBitSize;
 
             // FirstComponentPtr
-            byte[] specificationRecordPtr = new byte[SpecificationRecordPtrSize];
-            Array.Copy(buffer, offset, specificationRecordPtr, 0, SpecificationRecordPtrSize);
+            var specificationRecordPtr = BitConverter.ToInt32(buffer, offset);
             offset += SpecificationRecordPtrSize;
 
             // NextRecordPtr
-            byte[] nextRecordPtr = new byte[NextRecordPtrSize];
-            Array.Copy(buffer, offset, nextRecordPtr, 0, NextRecordPtrSize);
+            var nextRecordPtr = BitConverter.ToInt32(buffer, offset);
             offset += NextRecordPtrSize;
 
-            // Name
+            // DataArea
             string name = Encoding.UTF8.GetString(buffer, offset, buffer.Length - offset - ComponentTypeSize);
             offset += buffer.Length - offset - ComponentTypeSize;
 
@@ -200,12 +199,12 @@ namespace MyConsole2
 
         public SpecificationRecord? FirstRecord { get; set; }
 
-        public byte[] FirstRecordPtr { get; set; }
+        public int FirstRecordPtr { get; set; }
         public byte[] FreeAreaPtr { get; set; }
 
         public SpecificationHeader()
         {
-            FirstRecordPtr = BitConverter.GetBytes(-1);
+            FirstRecordPtr = -1;
             FreeAreaPtr = new byte[FreeAreaPtrSize];
         }
 
@@ -213,7 +212,7 @@ namespace MyConsole2
         {
             byte[] buffer = new byte[TotalSize];
 
-            Array.Copy(FirstRecordPtr, 0, buffer, 0, FirstRecordPtrSize);
+            Array.Copy(BitConverter.GetBytes(FirstRecordPtr), 0, buffer, 0, FirstRecordPtrSize);
             Array.Copy(FreeAreaPtr, 0, buffer, FirstRecordPtrSize, FreeAreaPtrSize);
 
             if (FirstRecord != null)
@@ -224,13 +223,14 @@ namespace MyConsole2
 
         public static SpecificationHeader FromBytes(byte[] buffer, int startIndex = 0)
         {
+            int offset = startIndex;
             var header = new SpecificationHeader();
 
-            header.FirstRecordPtr = new byte[FirstRecordPtrSize];
-            Array.Copy(buffer, startIndex, header.FirstRecordPtr, 0, FirstRecordPtrSize);
+            header.FirstRecordPtr = BitConverter.ToInt32(buffer, offset);
+            offset += FirstRecordPtrSize;
 
             header.FreeAreaPtr = new byte[FreeAreaPtrSize];
-            Array.Copy(buffer, startIndex, header.FreeAreaPtr, 0, FirstRecordPtrSize);
+            Array.Copy(buffer, offset, header.FreeAreaPtr, 0, FirstRecordPtrSize);
 
             return header;
         }
@@ -249,30 +249,31 @@ namespace MyConsole2
 
         public ComponentListRecord? ComponentRecord { get; set; }
         public SpecificationRecord? NextRecord { get; set; }
-        public List<MyComponent> Components { get; set; }
+        public MyComponent[] Components { get; set; }
 
         public bool IsDeleted { get; set; } // 0 - активно, -1 - удалено
-        public byte[] ComponentRecordPtr { get; set; } // Указатель на запись в списке изделий
+        public int ComponentRecordPtr { get; set; } // Указатель на запись в списке изделий
         public ushort Quantity { get; set; } // Кратность вхождения
-        public byte[] NextRecordPtr { get; set; } // Указатель на следующую запись в спецификации
-        public List<byte[]> ComponentPtrs { get; set; }
+        public int NextRecordPtr { get; set; } // Указатель на следующую запись в спецификации
+        public int[] ComponentPtrs { get; set; }
 
         public SpecificationRecord(ushort quantity = 2)
         {
             IsDeleted = false;
-            ComponentRecordPtr = BitConverter.GetBytes(-1);
+            ComponentRecordPtr = -1;
             Quantity = quantity;
-            NextRecordPtr = BitConverter.GetBytes(-1);
-            Components = new();
-            ComponentPtrs = new();
+            NextRecordPtr = -1;
+            Components = new MyComponent[quantity];
+            ComponentPtrs = new int[quantity];
+            Array.Fill(ComponentPtrs, -1);
         }
 
-        private int GetTotalSize()
+        public int GetTotalSize()
         {
-            int totalSize = ComponentPtrSize * ComponentPtrs.Count;
+            int totalSize = ComponentPtrSize * Quantity;
             return totalSize + DeletionBitSize + ComponentRecordPtrSize + QuantitySize + NextRecordPtrSize;
         }
-
+        //Сериализация
         public byte[] ToBytes()
         {
             byte[] buffer = new byte[GetTotalSize()];
@@ -283,7 +284,7 @@ namespace MyConsole2
             offset += DeletionBitSize;
 
             // ComponentPtr
-            Array.Copy(ComponentRecordPtr, 0, buffer, offset, ComponentRecordPtrSize);
+            Array.Copy(BitConverter.GetBytes(ComponentRecordPtr), 0, buffer, offset, ComponentRecordPtrSize);
             offset += ComponentRecordPtrSize;
 
             // Quantity
@@ -291,11 +292,11 @@ namespace MyConsole2
             offset += QuantitySize;
 
             // NextRecordPtr
-            Array.Copy(NextRecordPtr, 0, buffer, offset, NextRecordPtrSize);
+            Array.Copy(BitConverter.GetBytes(NextRecordPtr), 0, buffer, offset, NextRecordPtrSize);
 
             foreach (var component in ComponentPtrs)
             {
-                Array.Copy(component, 0, buffer, offset, ComponentPtrSize);
+                Array.Copy(BitConverter.GetBytes(component), 0, buffer, offset, ComponentPtrSize);
                 offset += ComponentPtrSize;
             }
 
@@ -304,8 +305,8 @@ namespace MyConsole2
 
             return buffer;
         }
-
-        public static SpecificationRecord FromBytes(byte[] buffer, int startIndex = 0, List<byte[]>? components = null)
+        //Десериализация
+        public static SpecificationRecord FromBytes(byte[] buffer, int startIndex = 0)
         {
             var record = new SpecificationRecord();
             int offset = startIndex;
@@ -315,8 +316,7 @@ namespace MyConsole2
             offset += DeletionBitSize;
 
             // ComponentPtr
-            record.ComponentRecordPtr = new byte[ComponentRecordPtrSize];
-            Array.Copy(buffer, offset, record.ComponentRecordPtr, 0, ComponentRecordPtrSize);
+            record.ComponentRecordPtr = BitConverter.ToInt32(buffer, offset);
             offset += ComponentRecordPtrSize;
 
             // Quantity
@@ -324,15 +324,31 @@ namespace MyConsole2
             offset += QuantitySize;
 
             // NextRecordPtr
-            record.NextRecordPtr = new byte[NextRecordPtrSize];
-            Array.Copy(buffer, offset, record.NextRecordPtr, 0, NextRecordPtrSize);
+            record.NextRecordPtr = BitConverter.ToInt32(buffer, offset);
+            offset += NextRecordPtrSize;
 
-            if (components != null)
+            int i = 0;
+            while(offset-startIndex < record.GetTotalSize())
             {
-                record.ComponentPtrs = components;
+                record.ComponentPtrs[i] = BitConverter.ToInt32(buffer, offset);
+                offset += ComponentPtrSize;
+                i++;
             }
 
             return record;
+        }
+
+        public void AddComponent(MyComponent myComponent)
+        {
+            int i = 0;
+            while (Components[i] != null)
+            {
+                if (i == Components.Length - 1)
+                    throw new Exception("Достигнут лимит компонентов в спецификации!");
+                i++;
+            }
+            Components[i] = myComponent;
+            ComponentPtrs[i] = myComponent.GetHashCode();
         }
     }
 }

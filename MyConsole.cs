@@ -127,6 +127,7 @@
                     else if (ans == "н")
                     {
                         manager = new FileManager(filename, recordLength, specFilename);
+                        manager.RestoreFiles();
                         break;
                     }
                     else
@@ -140,6 +141,7 @@
                 if (!filename.EndsWith(".prd"))
                     throw new Exception("У файла(-ов) неверно указано(-ы) расширение(-я)!");
                 manager = new FileManager(filename, recordLength, specFilename);
+                manager.CreateFiles();
             }
         }
 
