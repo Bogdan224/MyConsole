@@ -24,11 +24,15 @@
                     switch (commandText[0])
                     {
                         case "Create":
-                            if (commandText.Length != 2) throw new ArgumentException(paramNotFoundExceptionText);
+                            if (commandText.Length != 2) 
+                                throw new ArgumentException(paramNotFoundExceptionText);
+
                             commands.Create(commandText[1]);
                             break;
                         case "Open":
-                            if (commandText.Length != 2) throw new ArgumentException(paramNotFoundExceptionText);
+                            if (commandText.Length != 2) 
+                                throw new ArgumentException(paramNotFoundExceptionText);
+
                             commands.Open(commandText[1]);
                             break;
                         case "Input":
@@ -37,39 +41,55 @@
                                 var tmp = commandText[1].Split('/');
                                 commands.Input(tmp[0], tmp[1]);
                             }
-                            if (commandText.Length == 3) commands.Input(commandText[1], commandText[2].ToComponentType());
+                            if (commandText.Length == 3) 
+                                commands.Input(commandText[1], commandText[2].ToComponentType());
                             break;
                         case "Delete":
-                            if (commandText.Length != 2) throw new ArgumentException(paramNotFoundExceptionText);
+                            if (commandText.Length != 2) 
+                                throw new ArgumentException(paramNotFoundExceptionText);
                             if (commandText[1].Contains('/'))
                             {
                                 var tmp = commandText[1].Split('/');
                                 commands.Delete(tmp[0], tmp[1]);
                             }
-                            else commands.Delete(commandText[1]);
+                            else 
+                                commands.Delete(commandText[1]);
                             break;
                         case "Restore":
-                            if (commandText.Length != 2) throw new ArgumentException(paramNotFoundExceptionText);
-                            if (commandText[1] == "*") commands.Restore();
-                            else commands.Restore(commandText[1]);
+                            if (commandText.Length != 2) 
+                                throw new ArgumentException(paramNotFoundExceptionText);
+
+                            if (commandText[1] == "*") 
+                                commands.Restore();
+                            else 
+                                commands.Restore(commandText[1]);
                             break;
                         case "Truncate":
-                            if (commandText.Length != 1) throw new ArgumentException(paramNotExistsExceptionText);
+                            if (commandText.Length != 1) 
+                                throw new ArgumentException(paramNotExistsExceptionText);
                             commands.Truncate();
                             break;
                         case "Print":
-                            if (commandText.Length != 2) throw new ArgumentException(paramNotFoundExceptionText);
-                            if (commandText[1] == "*") commands.Print();
-                            else commands.Print(commandText[1]);
+                            if (commandText.Length != 2) 
+                                throw new ArgumentException(paramNotFoundExceptionText);
+
+                            if (commandText[1] == "*") 
+                                commands.Print();
+                            else 
+                                commands.Print(commandText[1]);
                             break;
                         case "Help":
-                            if (commandText.Length > 2) throw new ArgumentException(paramNotFoundExceptionText);
-                            if (commandText.Length == 1) commands.Help();
-                            else if (commandText.Length == 2) commands.Help(commandText[1]);
+                            if (commandText.Length > 2) 
+                                throw new ArgumentException(paramNotFoundExceptionText);
+                            if (commandText.Length == 1) 
+                                commands.Help();
+                            else if (commandText.Length == 2) 
+                                commands.Help(commandText[1]);
 
                             break;
                         case "Exit":
-                            if (commandText.Length != 1) throw new ArgumentException(paramNotExistsExceptionText);
+                            if (commandText.Length != 1) 
+                                throw new ArgumentException(paramNotExistsExceptionText);
                             commands.Exit();
                             return;
                         case "Test":
@@ -103,6 +123,7 @@
     {
         private FileManager? manager;
         private string path = @$"C:\Users\{Environment.UserName}\Downloads\";
+        private const string fileNotFoundExc = "Для начала нужно создать или открыть файл!";
 
         private bool CheckFilename(string filename)
         {
@@ -247,14 +268,18 @@
         /// <param name="componentName">Имя компонента</param>
         public void Print(string componentName)
         {
-            throw new NotImplementedException();
+            if (manager == null)
+                throw new FileNotFoundException(fileNotFoundExc);
+            manager.PrintCompWithSpec(componentName);
         }
         /// <summary>
         /// Команда выводит на экран построчно список компонентов.
         /// </summary>
         public void Print()
         {
-            throw new NotImplementedException();
+            if (manager == null)
+                throw new FileNotFoundException(fileNotFoundExc);
+            manager.PrintComponents();
         }
         /// <summary>
         /// Команда снимает бит удаления (присваивает значение 0) со всех записей, ранее

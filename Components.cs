@@ -11,7 +11,15 @@ namespace MyConsole2
 
         public override int GetHashCode()
         {
-            return ComponentName.GetHashCode();
+            unchecked
+            {
+                int hash = 23;
+                foreach (char c in ComponentName)
+                {
+                    hash = hash * 31 + c;
+                }
+                return hash;
+            }
         }
     }
 
@@ -20,7 +28,7 @@ namespace MyConsole2
         Detail, Product, Node
     }
 
-    public static class StringExtentions
+    public static class Extentions
     {
         public static ComponentType ToComponentType(this string str)
         {
@@ -30,6 +38,17 @@ namespace MyConsole2
                 "узел" => ComponentType.Node,
                 "изделие" => ComponentType.Product,
                 _ => throw new ArgumentException("Компонент не найден!"),
+            };
+        }
+
+        public static string ToString(this ComponentType type)
+        {
+            return type switch
+            {
+                ComponentType.Detail => "деталь",
+                ComponentType.Node => "узел",
+                ComponentType.Product => "изделие",
+                _ => throw new ArgumentException("Не существующий тип!")
             };
         }
     }
