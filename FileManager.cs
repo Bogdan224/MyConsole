@@ -118,23 +118,90 @@ namespace MyConsole2
 
         private static void RestoreObjectsFromPtrs(ComponentListHeader compHeader, SpecificationHeader specHeader)
         {
-            throw new NotImplementedException();
+            if(compHeader.FirstRecord != null)
+            {
+                for(var tmpRecord = compHeader.FirstRecord; tmpRecord.NextRecord != null; tmpRecord = tmpRecord.NextRecord)
+                {
+                    if (tmpRecord.SpecificationRecordPtr != -1)
+                    {
+                        var tmp = FindRecordByPtr(specHeader, tmpRecord.SpecificationRecordPtr);
+                        if (tmp == null)
+                            throw new Exception("Не удалось восстановить ссылки!");
+                        tmpRecord.SpecificationRecord = tmp;
+                    }
+                }
+            }
+
+            if(specHeader.FirstRecord != null)
+            {
+                for (var tmpRecord = specHeader.FirstRecord; tmpRecord.NextRecord != null; tmpRecord = tmpRecord.NextRecord)
+                {
+                    if (tmpRecord.ComponentRecordPtr != -1)
+                    {
+                        var tmp = FindRecordByPtr(compHeader, tmpRecord.ComponentRecordPtr);
+                        if (tmp == null)
+                            throw new Exception("Не удалось восстановить ссылки!");
+                        tmpRecord.ComponentRecord = tmp;
+
+                        foreach (var component in tmpRecord.ComponentPtrs)
+                        {
+                            if (component == -1)
+                                continue;
+                            var tmpComp = FindMyCompByPtr(compHeader, component);
+                            if(tmpComp == null)
+                                throw new Exception("Не удалось восстановить ссылки!");
+                            tmpRecord.AddComponent(tmpComp);
+                        }
+                    }
+                }
+            }
         }
+
+        private static T? FindRecordByPtr<T>(Header<T> header, int ptr) where T : Record<T>
+        {
+            if(header.FirstRecord != null)
+            {
+                if(header.FirstRecordPtr == ptr)
+                    return header.FirstRecord;
+                for(var tmpRecord = header.FirstRecord; tmpRecord.NextRecord != null; tmpRecord = tmpRecord.NextRecord)
+                {
+                    if(tmpRecord.NextRecordPtr == ptr)
+                        return tmpRecord.NextRecord;
+                }
+            }
+            return null;
+        }
+
 
         /// <summary>
         /// Метод ищет запись с названием компонента
         /// </summary>
         /// <param name="name">Название компонента</param>
         /// <returns>Если запись с компонентом найдена, то возвращает запись, иначе null</returns>
-        private ComponentListRecord? FindMyCompInCompListByName(string name)
+        private ComponentListRecord? FindMyCompByName(string name)
         {
             if (_compHeader.FirstRecord != null)
             {
                 var tmp = _compHeader.FirstRecord;
                 while (tmp != null)
                 {
-                    if ((tmp as ComponentListRecord)!.DataArea.ComponentName == name)
-                        return tmp as ComponentListRecord;
+                    if (tmp.DataArea.ComponentName == name)
+                        return tmp;
+                    tmp = tmp.NextRecord;
+                }
+            }
+            return null;
+        }
+
+        private static MyComponent? FindMyCompByPtr(ComponentListHeader header, int ptr)
+        {
+            if (header.FirstRecord != null)
+            {
+                var tmp = header.FirstRecord;
+                while (tmp != null)
+                {
+                    if (tmp.DataArea.GetHashCode() == ptr)
+                        return tmp.DataArea;
                     tmp = tmp.NextRecord;
                 }
             }
@@ -146,7 +213,7 @@ namespace MyConsole2
         /// </summary>
         public void AddComponentToComponentList(MyComponent component)
         { 
-            if (FindMyCompInCompListByName(component.ComponentName) != null)
+            if (FindMyCompByName(component.ComponentName) != null)
                 throw new ArgumentException("Компонент c таким именем уже существует!");
 
             var record = new ComponentListRecord(component);
@@ -160,10 +227,10 @@ namespace MyConsole2
                     _specHeader.FirstRecord = new SpecificationRecord()
                     {
                         ComponentRecord = record,
-                        ComponentRecordPtr = record.RecordPtr,
+                        ComponentRecordPtr = record.GetHashCode(),
                     };
-                    _specHeader.FirstRecordPtr = _specHeader.FirstRecord.RecordPtr;
-                    tmpSpecRec = (SpecificationRecord)_specHeader.FirstRecord;
+                    _specHeader.FirstRecordPtr = _specHeader.FirstRecord.GetHashCode();
+                    tmpSpecRec = _specHeader.FirstRecord;
                 }
                 //Иначе ищем пустую спецификацию в листе спецификаций
                 else
@@ -176,14 +243,14 @@ namespace MyConsole2
                     tmp.NextRecord = new SpecificationRecord()
                     {
                         ComponentRecord = record,
-                        ComponentRecordPtr = record.RecordPtr,
+                        ComponentRecordPtr = record.GetHashCode(),
                     };
-                    tmp.NextRecordPtr = tmp.NextRecord.RecordPtr;
-                    tmpSpecRec = (SpecificationRecord)tmp.NextRecord;
+                    tmp.NextRecordPtr = tmp.NextRecord.GetHashCode();
+                    tmpSpecRec = tmp.NextRecord;
                 }
 
                 record.SpecificationRecord = tmpSpecRec;
-                record.SpecificationRecordPtr = tmpSpecRec.RecordPtr;
+                record.SpecificationRecordPtr = tmpSpecRec.GetHashCode();
             }
 
             //Добавляем компонент в список компонентов
@@ -195,12 +262,12 @@ namespace MyConsole2
                     tmp = tmp.NextRecord;
                 }
                 tmp.NextRecord = record;
-                tmp.NextRecordPtr = record.RecordPtr;
+                tmp.NextRecordPtr = record.GetHashCode();
             }
             else
             {
                 _compHeader.FirstRecord = record;
-                _compHeader.FirstRecordPtr = record.RecordPtr;
+                _compHeader.FirstRecordPtr = record.GetHashCode();
             }
 
             UpdateFiles();
@@ -211,13 +278,13 @@ namespace MyConsole2
         /// </summary>
         public void AddComponentToSpecification(string component, string componentAdded)
         {
-            var compRec = FindMyCompInCompListByName(component);
+            var compRec = FindMyCompByName(component);
             if (compRec == null)
                 throw new ArgumentException("Компонент не найден!");
             if (compRec.DataArea.ComponentType == ComponentType.Detail)
                 throw new Exception("Деталь не может иметь спецификацию!");
 
-            var tmpComp = FindMyCompInCompListByName(componentAdded);
+            var tmpComp = FindMyCompByName(componentAdded);
             if (tmpComp == null)
                 throw new Exception("Невозможно добавить не существующее комплектующее!");
             if (tmpComp.DataArea.ComponentType == ComponentType.Product)

@@ -11,7 +11,7 @@ namespace MyConsole2
 
         public override int GetHashCode()
         {
-            return (ComponentName.GetHashCode() + ComponentType.GetHashCode())/2;
+            return ComponentName.GetHashCode();
         }
     }
 
