@@ -1,6 +1,6 @@
 ﻿using System.Xml.Linq;
 
-namespace MyConsole2
+namespace MyConsole2.Components
 {
     public interface ISpecification;
 
@@ -28,28 +28,5 @@ namespace MyConsole2
         Detail, Product, Node
     }
 
-    public static class Extentions
-    {
-        public static ComponentType ToComponentType(this string str)
-        {
-            return str.ToLower() switch
-            {
-                "деталь" => ComponentType.Detail,
-                "узел" => ComponentType.Node,
-                "изделие" => ComponentType.Product,
-                _ => throw new ArgumentException("Компонент не найден!"),
-            };
-        }
-
-        public static string ToStr(this ComponentType type)
-        {
-            return type switch
-            {
-                ComponentType.Detail => "Деталь",
-                ComponentType.Node => "Узел",
-                ComponentType.Product => "Изделие",
-                _ => throw new ArgumentException("Не существующий тип!")
-            };
-        }
-    }
+    
 }

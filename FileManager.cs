@@ -1,5 +1,6 @@
-﻿using System;
-using System.Xml.Linq;
+﻿using MyConsole2.Components;
+using MyConsole2.Headers;
+using MyConsole2.Records;
 
 namespace MyConsole2
 {
@@ -258,7 +259,7 @@ namespace MyConsole2
             return ComponentRecordListManager.GetComponents(_compHeader);
         }
 
-        public ComponentsSpecification? GetCompWithSpecs(string compName)
+        public ComponentsGraph? GetCompWithSpecs(string compName)
         {
             var myComp = ComponentRecordListManager.GetCompRecByName(_compHeader, compName);
             if (myComp == null)
@@ -269,7 +270,7 @@ namespace MyConsole2
             if (myComp.SpecificationRecord == null)
                 return null;
 
-            ComponentsSpecification specification = new(myComp.DataArea);
+            ComponentsGraph specification = new(myComp.DataArea);
 
             var tmpComp = myComp;
             while (tmpComp != null)
@@ -288,154 +289,15 @@ namespace MyConsole2
             _compFile?.Dispose();
             _specFile?.Dispose();
         }
-    }
+    }    
 
-    public class RecordListManager<T> where T : Record<T>
-    {
-        public static T? GetRecordByPtr(Header<T> header, int ptr)
-        {
-            if (header.FirstRecord != null)
-            {
-                if (header.FirstRecordPtr == ptr)
-                    return header.FirstRecord;
-                for (var tmpRecord = header.FirstRecord; tmpRecord.NextRecord != null; tmpRecord = tmpRecord.NextRecord)
-                {
-                    if (tmpRecord.NextRecordPtr == ptr)
-                        return tmpRecord.NextRecord;
-                }
-            }
-            return null;
-        }
-
-        public static void EnumerateRecord(Header<T> header, Action<T> action)
-        {
-            if (header.FirstRecord != null)
-            {
-                var tmp = header.FirstRecord;
-                while (tmp != null)
-                {
-                    action.Invoke(tmp);
-                    tmp = tmp.NextRecord;
-                }
-            }
-        }
-
-        public static void PushRecord(Header<T> header, T record)
-        {
-            if (header.FirstRecord != null)
-            {
-                var tmp = header.FirstRecord;
-                while (tmp.NextRecord != null)
-                {
-                    tmp = tmp.NextRecord;
-                }
-                tmp.NextRecord = record;
-                tmp.NextRecordPtr = record.GetHashCode();
-            }
-            else
-            {
-                header.FirstRecord = record;
-                header.FirstRecordPtr = record.GetHashCode();
-            }
-        }
-    }
-
-    public class ComponentRecordListManager : RecordListManager<ComponentRecord>
-    {
-        public static MyComponent? GetMyCompByPtr(ComponentHeader header, int ptr)
-        {
-            if (header.FirstRecord != null)
-            {
-                var tmp = header.FirstRecord;
-                while (tmp != null)
-                {
-                    if (tmp.DataArea.GetHashCode() == ptr)
-                        return tmp.DataArea;
-
-                    tmp = tmp.NextRecord;
-                }
-            }
-            return null;
-        }
-
-        public static int GetCompRecPtr(ComponentHeader header, string compName)
-        {
-            if (header.FirstRecord != null)
-            {
-                if (header.FirstRecord.DataArea.ComponentName == compName)
-                    return header.FirstRecordPtr;
-
-                var record = header.FirstRecord;
-                while (record.NextRecord != null)
-                {
-                    if (record.NextRecord.DataArea.ComponentName == compName)
-                        return record.NextRecordPtr;
-                    record = record.NextRecord;
-                }
-            }
-            return -1;
-        }
-
-        /// <summary>
-        /// Метод ищет запись с названием компонента
-        /// </summary>
-        /// <param name="name">Название компонента</param>
-        /// <returns>Если запись с компонентом найдена, то возвращает запись, иначе null</returns>
-        public static ComponentRecord? GetCompRecByName(ComponentHeader header, string name)
-        {
-            if (header.FirstRecord != null)
-            {
-                var tmp = header.FirstRecord;
-                while (tmp != null)
-                {
-                    if (tmp.DataArea.ComponentName == name)
-                        return tmp;
-                    tmp = tmp.NextRecord;
-                }
-            }
-            return null;
-        }
-
-        public static IEnumerable<MyComponent> GetComponents(ComponentHeader header)
-        {
-            var res = new List<MyComponent>();
-
-            var tmp = new Action<ComponentRecord>(x =>
-            {
-                res.Add(x.DataArea);
-            });
-
-            EnumerateRecord(header, tmp);
-
-            return res;
-        }
-    }
-
-    public class SpecificationRecordListManager : RecordListManager<SpecificationRecord>
-    {
-        public static void EnumerateSpecification(SpecificationHeader record, Action<SpecificationRecord> action)
-        {
-            var action1 = new Action<SpecificationRecord>(record =>
-            {
-                var tmp = record;
-                while (tmp != null)
-                {
-                    action.Invoke(tmp);
-                    tmp = tmp.SpecificationNext;
-                }
-            });
-
-            EnumerateRecord(record, action1);
-        }
-    }
-
-    public class ComponentsSpecification
+    public class ComponentsGraph
     {
         public MyComponent Value { get; set; }
 
-        public List<ComponentsSpecification> Specifications { get; set; }
+        public List<ComponentsGraph> Specifications { get; set; }
 
-        public ComponentsSpecification(MyComponent value)
+        public ComponentsGraph(MyComponent value)
         {
             Value = value;
             Specifications = new();

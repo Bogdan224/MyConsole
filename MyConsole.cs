@@ -1,4 +1,7 @@
-﻿namespace MyConsole2
+﻿using MyConsole2.Components;
+using MyConsole2.Extensions;
+
+namespace MyConsole2
 {
     public class MyConsole
     {
