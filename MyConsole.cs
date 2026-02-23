@@ -270,7 +270,7 @@
         {
             if (manager == null)
                 throw new FileNotFoundException(fileNotFoundExc);
-            manager.PrintCompWithSpec(componentName);
+            manager.GetCompWithSpecs(componentName);
         }
         /// <summary>
         /// Команда выводит на экран построчно список компонентов.
@@ -279,7 +279,21 @@
         {
             if (manager == null)
                 throw new FileNotFoundException(fileNotFoundExc);
-            manager.PrintComponents();
+
+            var components = manager.GetAllComponents();
+
+            if(components.Count() == 0)
+            {
+                Console.WriteLine("Список пустой!");
+                return;
+            }
+
+            Console.WriteLine($"{"Наименование",-20}Тип");
+
+            foreach (var component in components)
+            {
+                Console.WriteLine($"{component.ComponentName,-20}{component.ComponentType.ToStr()}");
+            }
         }
         /// <summary>
         /// Команда снимает бит удаления (присваивает значение 0) со всех записей, ранее
