@@ -222,6 +222,7 @@ namespace MyConsole2
             {
                 _specHeader.PushRecord(spec);
                 comp.SpecificationRecord = spec;
+                comp.SpecificationRecordPtr = spec.GetHashCode();
             }
             else
             {
@@ -346,12 +347,10 @@ namespace MyConsole2
 
         public void EnumerateComponents(ComponentsGraph graph, Action<MyComponent> action)
         {
-            throw new NotImplementedException();
-
-            if (Specifications.Count == 0)
+            if (graph.Specifications.Count == 0)
                 return;
 
-            foreach (var item in Specifications)
+            foreach (var item in graph.Specifications)
             {
                 action.Invoke(item.Value);
                 EnumerateComponents(item, action);
