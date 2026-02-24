@@ -3,6 +3,7 @@ using MyConsole2.Extensions;
 using MyConsole2.Headers;
 using MyConsole2.Records;
 using System.Collections.Generic;
+using System.ComponentModel;
 
 namespace MyConsole2
 {
@@ -13,6 +14,7 @@ namespace MyConsole2
     {
         private static string _path = @$"C:\Users\{Environment.UserName}\Downloads\";
         private const string _compNotFoundExc = "Компонент не найден!";
+        private const string _compDeletedExc = "Компонент уже помечен на удаление!";
 
         private FileStream _compFile;
         private FileStream _specFile;
@@ -184,7 +186,7 @@ namespace MyConsole2
         /// </summary>
         public void AddComponentToComponentList(MyComponent component)
         {
-            if (ComponentRecordListExtensions.GetCompRecByName(_compHeader, component.ComponentName) != null)
+            if (_compHeader.GetCompRecByName(component.ComponentName) != null)
                 throw new ArgumentException("Компонент c таким именем уже существует!");
 
             var record = new ComponentRecord(component);
@@ -198,19 +200,31 @@ namespace MyConsole2
         /// <summary>
         /// Добавление компонента в спецификацию
         /// </summary>
-        public void AddComponentToSpecification(string component, string componentAdded)
+        public void AddComponentToSpecification(string parentComponent, string componentAdded)
         {
-            var comp = _compHeader.GetCompRecByName(component);
+            if (parentComponent == componentAdded)
+                throw new Exception("Нельзя добавить в спецификацию этот же компонент!");
+            var comp = _compHeader.GetCompRecByName(parentComponent);
             if (comp == null)
-                throw new ArgumentException(_compNotFoundExc);
+                throw new ArgumentException($"{parentComponent}: {_compNotFoundExc}");
             if (comp.DataArea.ComponentType == ComponentType.Detail)
                 throw new Exception("Деталь не может иметь спецификацию!");
 
             var compAdded = _compHeader.GetCompRecByName(componentAdded);
             if (compAdded == null)
-                throw new Exception("Невозможно добавить не существующее комплектующее!");
-            if (compAdded.DataArea.ComponentType == ComponentType.Product)
-                throw new Exception("Нельзя добавить изделие в спецификацию!");
+                throw new Exception($"{componentAdded}: {_compNotFoundExc}");
+
+            comp.SpecificationRecord?.EnumerateAllSpecs(rec =>
+            {
+                if(rec.ComponentRecord!.DataArea.ComponentName == componentAdded)
+                    throw new Exception("Нельзя добавить в спецификацию уже добавленный компонент!");
+            });
+
+            compAdded.SpecificationRecord?.EnumerateAllSpecs(rec =>
+            {
+                if (rec.ComponentRecord!.DataArea.ComponentName == parentComponent)
+                    throw new Exception("Нельзя добавить в спецификацию родительский компонент!");
+            });
 
             var spec = new SpecificationRecord()
             {
@@ -239,6 +253,61 @@ namespace MyConsole2
             UpdateFiles();
         }
 
+        public void DeleteComponent(string component)
+        {
+            var comp = _compHeader.GetCompRecByName(component);
+            if (comp == null)
+                throw new ArgumentException(_compNotFoundExc);
+            if (comp.IsDeleted)
+                throw new ArgumentException(_compDeletedExc);
+
+            comp.IsDeleted = true;
+
+
+            _specHeader.EnumerateSpecification(rec =>
+            {
+                if (!rec.IsDeleted && rec.ComponentRecord!.DataArea.ComponentName == component)
+                {
+                    comp.IsDeleted = false;
+                    throw new ArgumentException("Компонент присутствует в спецификациях других компонентов!");
+                }
+            });
+
+            UpdateCompFile();
+        }
+
+        public void DeleteComponentInSpecification(string parentComponent, string componentDeleted)
+        {
+            var parentComp = _compHeader.GetCompRecByName(parentComponent);
+            if (parentComp == null)
+                throw new ArgumentException($"{parentComponent}: {_compNotFoundExc}");
+            if (parentComp.DataArea.ComponentType == ComponentType.Detail)
+                throw new Exception("У детали не может быть спецификации!");
+            if (parentComp.SpecificationRecord == null)
+                throw new Exception("У компонента отсутствует спецификация!");
+
+            var compDeleted = _compHeader.GetCompRecByName(componentDeleted);
+            if (compDeleted == null)
+                throw new ArgumentException($"{componentDeleted}: {_compNotFoundExc}");
+
+            var condition = parentComp.SpecificationRecord.EnumerateAllSpecsWithCondition(rec => 
+            {
+                if (rec.ComponentRecord!.DataArea.ComponentName == componentDeleted)
+                {
+                    if (rec.IsDeleted)
+                        throw new Exception(_compDeletedExc);
+                    rec.IsDeleted = true;
+                    return true;
+                }
+                return false;
+            });
+
+            if (!condition)
+                throw new Exception("Компонент в спецификации не найден");
+
+            UpdateSpecFile();
+        }
+
         public void Test()
         {
             MyComponent myComponent = new("Изделие1", ComponentType.Product);
@@ -246,6 +315,7 @@ namespace MyConsole2
             MyComponent myComponent2 = new("Узел2", ComponentType.Node);
             MyComponent myComponent3 = new("Деталь1", ComponentType.Detail);
             MyComponent myComponent4 = new("Деталь2", ComponentType.Detail);
+            MyComponent myComponent5 = new("Деталь3", ComponentType.Detail);
             AddComponentToComponentList(myComponent);
             AddComponentToComponentList(myComponent1);
             AddComponentToComponentList(myComponent2);
@@ -255,6 +325,9 @@ namespace MyConsole2
             AddComponentToSpecification(myComponent.ComponentName, myComponent3.ComponentName);
             AddComponentToSpecification(myComponent1.ComponentName, myComponent2.ComponentName);
             AddComponentToSpecification(myComponent1.ComponentName, myComponent4.ComponentName);
+            AddComponentToComponentList(myComponent5);
+            AddComponentToSpecification(myComponent2.ComponentName, myComponent5.ComponentName);
+            
         }
 
         public IEnumerable<MyComponent> GetAllComponents()
@@ -262,25 +335,29 @@ namespace MyConsole2
             return ComponentRecordListExtensions.GetComponents(_compHeader);
         }
 
-        public ComponentsGraph GetCompWithSpecs(string compName)
+        public ComponentsGraph GetCompWithSpecs(string component)
         {
-            var myComp = _compHeader.GetCompRecByName(compName);
+            var myComp = _compHeader.GetCompRecByName(component);
             if (myComp == null)
                 throw new ArgumentException(_compNotFoundExc);
             if (myComp.DataArea.ComponentType == ComponentType.Detail)
                 throw new Exception("У детали нет спецификации!");
 
-            ComponentsGraph specification = new(myComp.DataArea);
-
-            if (myComp.SpecificationRecord == null)
-                return specification;
-
-            FindAllSpecs(myComp.SpecificationRecord, specification);
+            ComponentsGraph specification = AddAllSpecsToGraph(myComp);
 
             return specification;
         }
 
-        private void FindAllSpecs(SpecificationRecord record, ComponentsGraph graph)
+        private ComponentsGraph AddAllSpecsToGraph(ComponentRecord record)
+        {
+            var res = new ComponentsGraph(record.DataArea);
+
+            FindAllSpecs(record.SpecificationRecord, res);
+
+            return res;
+        }
+
+        private void FindAllSpecs(SpecificationRecord? record, ComponentsGraph graph)
         {
             while (record != null)
             {
@@ -311,50 +388,6 @@ namespace MyConsole2
         {
             Value = value;
             Specifications = new();
-        }
-
-        public List<List<string>>? AllSpecsToStrings()
-        {
-            if (Specifications.Count == 0)
-                return null;
-
-            List<List<string>> res = new();
-
-            var strings = SpecsToStrings().ToList();
-            if (strings.Count != 0)
-                res.Add(strings);
-
-            foreach (var item in Specifications)
-            {
-                var list = item.AllSpecsToStrings();
-                if (list != null)
-                    res = res.Concat(list).ToList();
-            }
-
-            return res;
-        }
-
-        public IEnumerable<string> SpecsToStrings()
-        {
-            if (Specifications.Count == 0)
-                yield break;
-
-            foreach (var item in Specifications)
-            {
-                yield return item.Value.ComponentName;
-            }
-        }
-
-        public void EnumerateComponents(ComponentsGraph graph, Action<MyComponent> action)
-        {
-            if (graph.Specifications.Count == 0)
-                return;
-
-            foreach (var item in graph.Specifications)
-            {
-                action.Invoke(item.Value);
-                EnumerateComponents(item, action);
-            }
         }
     }
 }

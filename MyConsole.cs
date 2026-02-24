@@ -1,5 +1,7 @@
 ﻿using MyConsole2.Components;
 using MyConsole2.Extensions;
+using System.ComponentModel;
+using System.Text;
 
 namespace MyConsole2
 {
@@ -27,25 +29,30 @@ namespace MyConsole2
                     switch (commandText[0])
                     {
                         case "Create":
-                            if (commandText.Length != 2) 
+                            if (commandText.Length == 2)
+                                commands.Create(commandText[1]);
+                            else if(commandText.Length == 3)
+                                commands.Create(commandText[1], Convert.ToUInt16(commandText[2]));
+                            else if (commandText.Length == 4)
+                                commands.Create(commandText[1], Convert.ToUInt16(commandText[2]), commandText[3]);
+                            else
                                 throw new ArgumentException(paramNotFoundExceptionText);
-
-                            commands.Create(commandText[1]);
                             break;
                         case "Open":
                             if (commandText.Length != 2) 
                                 throw new ArgumentException(paramNotFoundExceptionText);
-
                             commands.Open(commandText[1]);
                             break;
                         case "Input":
-                            if (commandText.Length == 2)
+                            if (commandText.Length == 2 && commandText[1].Contains('/'))
                             {
                                 var tmp = commandText[1].Split('/');
                                 commands.Input(tmp[0], tmp[1]);
                             }
-                            if (commandText.Length == 3) 
+                            else if (commandText.Length == 3) 
                                 commands.Input(commandText[1], commandText[2].ToComponentType());
+                            else
+                                throw new ArgumentException(paramNotFoundExceptionText);
                             break;
                         case "Delete":
                             if (commandText.Length != 2) 
@@ -96,6 +103,8 @@ namespace MyConsole2
                             commands.Exit();
                             return;
                         case "Test":
+                            if (commandText.Length != 1)
+                                throw new ArgumentException(paramNotExistsExceptionText);
                             commands.Test();
                             break;
                         default:
@@ -185,20 +194,26 @@ namespace MyConsole2
         /// устанавливая бит удаления в -1. Если на компонент имеются ссылки в спецификациях
         /// других компонент, эта команда вызывает ошибку.
         /// </summary>
-        /// <param name="companentName">Имя компонента</param>
-        public void Delete(string companentName)
+        /// <param name="component">Имя компонента</param>
+        public void Delete(string component)
         {
-            throw new NotImplementedException();
+            if (manager == null)
+                throw new FileNotFoundException(fileNotFoundExc);
+            manager.DeleteComponent(component);
+            Console.WriteLine("Компонент готов к удалению!");
         }
         /// <summary>
         /// Команда логически удаляет комплектующее из спецификации компонента, устанавливая бит удаления в -1.
         /// Для детали эта команда вызывает ошибку.
         /// </summary>
-        /// <param name="companentName">Имя компонента</param>
-        /// <param name="accessoriesName">Имя комплектующего</param>
-        public void Delete(string companentName, string accessoriesName)
+        /// <param name="parentComponent">Имя компонента</param>
+        /// <param name="componentDeleted">Имя комплектующего</param>
+        public void Delete(string parentComponent, string componentDeleted)
         {
-            throw new NotImplementedException();
+            if (manager == null)
+                throw new FileNotFoundException(fileNotFoundExc);
+            manager.DeleteComponentInSpecification(parentComponent, componentDeleted);
+            Console.WriteLine("Спецификация готов к удалению!");
         }
         /// <summary>
         /// Команда закрывает все файлы и завершает программу.
@@ -218,31 +233,36 @@ namespace MyConsole2
         /// <summary>
         /// Команда включает компонент в список.
         /// </summary>
-        /// <param name="companentName">Имя компонента</param>
+        /// <param name="component">Имя компонента</param>
         /// <param name="type">Тип компанента</param>
-        public void Input(string companentName, ComponentType type)
+        public void Input(string component, ComponentType type)
         {
-
-            throw new NotImplementedException();
+            if (manager == null)
+                throw new FileNotFoundException(fileNotFoundExc);
+            manager.AddComponentToComponentList(new(component, type));
+            Console.WriteLine("Компонент добавлен!");
         }
         /// <summary>
         /// Команда включает комплектующее в
         /// спецификацию компонента. Имя комплектующего должно быть в списке, в противном
         /// случае и для детали эта команда вызывает ошибку.
         /// </summary>
-        /// <param name="companentName">Имя компонента</param>
-        /// <param name="detailName">Имя комплектующего</param>
-        public void Input(string companentName, string detailName)
+        /// <param name="parentComponent">Имя компонента</param>
+        /// <param name="componentAdded">Имя комплектующего</param>
+        public void Input(string parentComponent, string componentAdded)
         {
-            throw new NotImplementedException();
+            if (manager == null)
+                throw new FileNotFoundException(fileNotFoundExc);
+            manager.AddComponentToSpecification(parentComponent, componentAdded);
+            Console.WriteLine("Компонент добавлен в спецификацию!");
         }
         /// <summary>
         /// Команда снимает бит удаления (присваивает значение 0) со всех
         /// записей, относящихся к заданному компоненту и ранее помеченных на удаление, а также
         /// восстанавливает алфавитный порядок, который мог быть нарушен из-за добавления новых записей.
         /// </summary>
-        /// <param name="companentName">Имя компонента</param>
-        public void Restore(string companentName)
+        /// <param name="componentName">Имя компонента</param>
+        public void Restore(string componentName)
         {
             throw new NotImplementedException();
         }
@@ -277,12 +297,23 @@ namespace MyConsole2
 
             Console.WriteLine(graph.Value.ComponentName);
 
-            var action = new Action<MyComponent>(comp =>
+            var action = new Action<MyComponent, int>((comp, depth) =>
             {
-                Console.WriteLine(comp.ComponentName);
+                var str = "  |";
+                var sb = new StringBuilder();
+
+                // Первая строка
+                sb.Append(string.Concat(Enumerable.Repeat(str, depth)));
+                sb.AppendLine();
+
+                // Вторая строка
+                sb.Append(string.Concat(Enumerable.Repeat(str, depth - 1)));
+                sb.AppendLine("  " + comp.ComponentName);
+
+                Console.Write(sb.ToString());
             });
 
-            graph.EnumerateComponents(graph, action);
+            graph.EnumerateComponents(action);
         }
         /// <summary>
         /// Команда выводит на экран построчно список компонентов.
@@ -319,7 +350,7 @@ namespace MyConsole2
         /// <summary>
         /// Команда физически удаляет из списков записи, бит удаления которых установлен в
         /// -1, и перераспределяет записи списков таким образом, что все они становятся смежными, а
-        /// свободная область располагается в конце файлов.Корректирует указатель на свободную
+        /// свободная область располагается в конце файлов. Корректирует указатель на свободную
         /// область файла;
         /// </summary>
         public void Truncate()
@@ -329,7 +360,10 @@ namespace MyConsole2
 
         public void Test()
         {
-            manager?.Test();
+            if (manager == null)
+                throw new FileNotFoundException(fileNotFoundExc);
+            manager.Test();
+            Print("Изделие1");
         }
 
         public void Dispose()
