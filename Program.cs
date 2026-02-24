@@ -1,11 +1,4 @@
-﻿using MyConsole2;
-using System;
-using System.ComponentModel;
-using System.IO;
-using System.Reflection.PortableExecutable;
-using System.Text;
-
-namespace MyConsole2
+﻿namespace MyConsole2
 {
     /// <summary>
     /// Главный класс программы с обработкой командной строки

@@ -2,8 +2,6 @@
 
 namespace MyConsole2.Components
 {
-    public interface ISpecification;
-
     public class MyComponent(string name, ComponentType type)
     {
         public ComponentType ComponentType { get; private set; } = type;

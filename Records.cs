@@ -1,8 +1,5 @@
 ﻿using MyConsole2.Components;
 using MyConsole2.Headers;
-using System;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
 using System.Text;
 
 namespace MyConsole2.Records

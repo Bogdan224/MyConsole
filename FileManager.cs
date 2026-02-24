@@ -2,8 +2,6 @@
 using MyConsole2.Extensions;
 using MyConsole2.Headers;
 using MyConsole2.Records;
-using System.Collections.Generic;
-using System.ComponentModel;
 
 namespace MyConsole2
 {
@@ -216,7 +214,7 @@ namespace MyConsole2
 
             comp.SpecificationRecord?.EnumerateAllSpecs(rec =>
             {
-                if(rec.ComponentRecord!.DataArea.ComponentName == componentAdded)
+                if (rec.ComponentRecord!.DataArea.ComponentName == componentAdded)
                     throw new Exception("Нельзя добавить в спецификацию уже добавленный компонент!");
             });
 
@@ -290,7 +288,7 @@ namespace MyConsole2
             if (compDeleted == null)
                 throw new ArgumentException($"{componentDeleted}: {_compNotFoundExc}");
 
-            var condition = parentComp.SpecificationRecord.EnumerateAllSpecsWithCondition(rec => 
+            var condition = parentComp.SpecificationRecord.EnumerateAllSpecsWithCondition(rec =>
             {
                 if (rec.ComponentRecord!.DataArea.ComponentName == componentDeleted)
                 {
@@ -306,6 +304,68 @@ namespace MyConsole2
                 throw new Exception("Компонент в спецификации не найден");
 
             UpdateSpecFile();
+        }
+
+        public void RestoreAllComponents()
+        {
+            var action = new Action<Record>(rec =>
+            {
+                if (rec.IsDeleted)
+                    rec.IsDeleted = false;
+            });
+
+            _compHeader.EnumerateRecord(action);
+            _specHeader.EnumerateSpecification(action);
+        }
+
+        public void Truncate()
+        {
+            throw new NotImplementedException();
+
+            var compRec = _compHeader.FirstRecord;
+
+            if (compRec != null)
+            {
+                if (compRec.NextRecord == null)
+                {
+                    if (compRec.IsDeleted)
+                    {
+                        TruncateSpecifications(compRec.SpecificationRecord);
+                        _compHeader.FirstRecord = null;
+                        _compHeader.FirstRecordPtr = -1;
+                    }
+                }
+                else
+                {
+                    while (compRec!.NextRecord != null)
+                    {
+                        if (compRec.NextRecord.IsDeleted)
+                        {
+                            TruncateSpecifications(compRec.SpecificationRecord);
+                            compRec.NextRecordPtr = compRec.NextRecord.NextRecordPtr;
+                            compRec.NextRecord = compRec.NextRecord.NextRecord;
+                        }
+                        compRec = compRec.NextRecord;
+                    }
+                }
+            }
+
+            var specRec = _specHeader.FirstRecord;
+
+        }
+
+        private void TruncateSpecifications(SpecificationRecord? record)
+        {
+            if (record == null)
+                return;
+
+            while (record != null)
+            {
+                TruncateSpecifications(record.ComponentRecord!.SpecificationRecord);
+                record = record.SpecificationNext;
+            }
+
+
         }
 
         public void Test()
@@ -327,12 +387,11 @@ namespace MyConsole2
             AddComponentToSpecification(myComponent1.ComponentName, myComponent4.ComponentName);
             AddComponentToComponentList(myComponent5);
             AddComponentToSpecification(myComponent2.ComponentName, myComponent5.ComponentName);
-            
         }
 
         public IEnumerable<MyComponent> GetAllComponents()
         {
-            return ComponentRecordListExtensions.GetComponents(_compHeader);
+            return _compHeader.GetComponents();
         }
 
         public ComponentsGraph GetCompWithSpecs(string component)
