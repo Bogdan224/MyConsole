@@ -342,7 +342,7 @@ namespace MyConsole2
             UpdateFiles();
         }
 
-        private void TruncateComponent(ComponentRecord component)
+        public void TruncateComponent(ComponentRecord component)
         {
             if (!component.IsDeleted)
                 throw new Exception("Компонент не помечен на удаление!");
@@ -371,7 +371,7 @@ namespace MyConsole2
             UpdateFiles();
         }
 
-        private void TruncateSpecification(SpecificationRecord specification)
+        public void TruncateSpecification(SpecificationRecord specification)
         {
             if (!specification.IsDeleted)
                 throw new Exception("Спецификация не помечена на удаление!");
