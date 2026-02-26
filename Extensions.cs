@@ -1,6 +1,8 @@
 ﻿using MyConsole2.Components;
+using MyConsole2.Exceptions;
 using MyConsole2.Headers;
 using MyConsole2.Records;
+using System.Runtime.Intrinsics.X86;
 
 namespace MyConsole2.Extensions
 {
@@ -46,7 +48,38 @@ namespace MyConsole2.Extensions
             return null;
         }
 
-        public static void EnumerateRecord<T>(this Header<T> header, Action<T> action) where T : Record<T>
+        public static T? GetPredRecordByPtr<T>(this Header<T> header, int ptr) where T : Record<T>
+        {
+            if (header.FirstRecord != null)
+            {
+                if (header.FirstRecordPtr == ptr)
+                    throw new FirstComponentInListException();
+                for (var tmpRecord = header.FirstRecord; tmpRecord.NextRecord != null; tmpRecord = tmpRecord.NextRecord)
+                {
+                    if (tmpRecord.NextRecordPtr == ptr)
+                        return tmpRecord;
+                }
+            }
+            return null;
+        }
+
+        public static int GetRecPtr<T>(this Header<T> header, T record) where T : Record<T>
+        {
+            if (header.FirstRecord != null)
+            {
+                if(ReferenceEquals(header.FirstRecord, record))
+                    return header.FirstRecordPtr;
+                for (var tmpRecord = header.FirstRecord; tmpRecord.NextRecord != null; tmpRecord = tmpRecord.NextRecord)
+                {
+                    if (ReferenceEquals(tmpRecord.NextRecord, record))
+                        return tmpRecord.NextRecordPtr;
+                }
+            }
+
+            return -1;
+        }
+
+        public static void EnumerateRecords<T>(this Header<T> header, Action<T> action) where T : Record<T>
         {
             if (header.FirstRecord != null)
             {
@@ -81,7 +114,7 @@ namespace MyConsole2.Extensions
 
     public static class ComponentRecordListExtensions
     {
-        public static MyComponent? GetMyCompByPtr(this ComponentHeader header, int ptr)
+        public static MyComponent? GetCompByPtr(this ComponentHeader header, int ptr)
         {
             if (header.FirstRecord != null)
             {
@@ -118,16 +151,16 @@ namespace MyConsole2.Extensions
         /// <summary>
         /// Метод ищет запись с названием компонента
         /// </summary>
-        /// <param name="name">Название компонента</param>
+        /// <param name="compName">Название компонента</param>
         /// <returns>Если запись с компонентом найдена, то возвращает запись, иначе null</returns>
-        public static ComponentRecord? GetCompRecByName(this ComponentHeader header, string name)
+        public static ComponentRecord? GetCompRecByName(this ComponentHeader header, string compName)
         {
             if (header.FirstRecord != null)
             {
                 var tmp = header.FirstRecord;
                 while (tmp != null)
                 {
-                    if (tmp.DataArea.ComponentName == name)
+                    if (tmp.DataArea.ComponentName == compName)
                         return tmp;
                     tmp = tmp.NextRecord;
                 }
@@ -144,7 +177,7 @@ namespace MyConsole2.Extensions
                 res.Add(x.DataArea);
             });
 
-            header.EnumerateRecord(tmp);
+            header.EnumerateRecords(tmp);
 
             return res;
         }
@@ -152,10 +185,9 @@ namespace MyConsole2.Extensions
 
     public static class SpecificationRecordListExtensions
     {
-        public static void EnumerateSpecification(this SpecificationHeader header, Action<SpecificationRecord> action)
+        public static void EnumerateSpecificationRecords(this SpecificationHeader header, Action<SpecificationRecord> action)
         {
-            var action1 = new Action<SpecificationRecord>(record =>
-            {
+            header.EnumerateRecords(record => {
                 var tmp = record;
                 while (tmp != null)
                 {
@@ -163,24 +195,22 @@ namespace MyConsole2.Extensions
                     tmp = tmp.SpecificationNext;
                 }
             });
-
-            header.EnumerateRecord(action1);
         }
 
-        public static void EnumerateAllSpecs(this SpecificationRecord record, Action<SpecificationRecord> action)
+        public static void EnumerateAllCompSpecs(this SpecificationRecord record, Action<SpecificationRecord> action)
         {
             while (record != null)
             {
                 action.Invoke(record);
 
                 if (record.ComponentRecord!.SpecificationRecord != null)
-                    EnumerateAllSpecs(record.ComponentRecord.SpecificationRecord, action);
+                    EnumerateAllCompSpecs(record.ComponentRecord.SpecificationRecord, action);
 
                 record = record.SpecificationNext;
             }
         }
 
-        public static bool EnumerateAllSpecsWithCondition(this SpecificationRecord record, Func<SpecificationRecord, bool> action)
+        public static bool EnumerateAllCompSpecsWithCondition(this SpecificationRecord record, Func<SpecificationRecord, bool> action)
         {
             while (record != null)
             {
@@ -188,12 +218,22 @@ namespace MyConsole2.Extensions
                     return true;
 
                 if (record.ComponentRecord!.SpecificationRecord != null)
-                    return EnumerateAllSpecsWithCondition(record.ComponentRecord.SpecificationRecord, action);
+                    return EnumerateAllCompSpecsWithCondition(record.ComponentRecord.SpecificationRecord, action);
 
                 record = record.SpecificationNext;
             }
-
             return false;
+        }
+
+        public static int GetPredSpecPtr(this SpecificationHeader header, SpecificationRecord record)
+        { 
+            if(header.GetRecPtr(record) != -1)
+                throw new FirstComponentInListException();
+
+            while(record.SpecificationNext != null)
+            {
+                //if()
+            }
         }
     }
 
