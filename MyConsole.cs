@@ -212,7 +212,7 @@ namespace MyConsole2
             if (manager == null)
                 throw new FileNotFoundException(fileNotFoundExc);
             manager.DeleteComponentInSpecification(parentComponent, componentDeleted);
-            Console.WriteLine("Спецификация готов к удалению!");
+            Console.WriteLine("Спецификация готова к удалению!");
         }
         /// <summary>
         /// Команда закрывает все файлы и завершает программу.
@@ -290,7 +290,10 @@ namespace MyConsole2
         /// <param name="componentName">Имя компонента</param>
         public void Restore(string componentName)
         {
-            throw new NotImplementedException();
+            if (manager == null)
+                throw new FileNotFoundException(fileNotFoundExc);
+            manager.RestoreComponentWithSpecs(componentName);
+            Console.WriteLine("С компонента и его спецификации сняты биты удаления!");
         }
         /// <summary>
         /// Команда открывает указанный файл и связанные с ним файлы в режиме rw,
@@ -374,6 +377,7 @@ namespace MyConsole2
             if (manager == null)
                 throw new FileNotFoundException(fileNotFoundExc);
             manager.RestoreAllComponents();
+            Console.WriteLine("Все биты удаления сняты");
         }
         /// <summary>
         /// Команда физически удаляет из списков записи, бит удаления которых установлен в
