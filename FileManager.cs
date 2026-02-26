@@ -327,6 +327,7 @@ namespace MyConsole2
                     TruncateComponent(rec);
             });
 
+            //_specHeader.
         }
 
         private void TruncateComponent(ComponentRecord component)
@@ -459,19 +460,6 @@ namespace MyConsole2
         {
             _compFile?.Dispose();
             _specFile?.Dispose();
-        }
-    }
-
-    public class ComponentsGraph
-    {
-        public MyComponent Value { get; set; }
-
-        public List<ComponentsGraph> Specifications { get; set; }
-
-        public ComponentsGraph(MyComponent value)
-        {
-            Value = value;
-            Specifications = new();
         }
     }
 }

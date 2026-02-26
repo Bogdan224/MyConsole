@@ -150,7 +150,6 @@ namespace MyConsole2.Records
         public ushort Quantity { get; set; } // Кратность вхождения
         public int SpecificationNextPtr { get; set; }
 
-
         public SpecificationRecord(ushort quantity = 2) : base()
         {
             ComponentRecordPtr = -1;
@@ -222,5 +221,5 @@ namespace MyConsole2.Records
         }
     }
 
-   
+
 }

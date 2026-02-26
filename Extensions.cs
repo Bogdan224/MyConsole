@@ -230,10 +230,7 @@ namespace MyConsole2.Extensions
             if(header.GetRecPtr(record) != -1)
                 throw new FirstComponentInListException();
 
-            while(record.SpecificationNext != null)
-            {
-                //if()
-            }
+            //header.
         }
     }
 
